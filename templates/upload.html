@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File2MD (markitdown Web)</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+<div class="bg-white shadow-md rounded-lg p-8 w-full max-w-md">
+    <h1 class="text-2xl font-semibold mb-4 text-center">File2MD (markitdown Web)</h1>
+    <h2> Convert to Markdown</h2>
+    <p>允许上传的文件类型:</p>
+    <p>
+    {% for extension in allowedType %}
+        {{ extension }} {% if not loop.last %}| {% endif %}
+    {% endfor %}
+    </p>
+
+    <p>最大上传大小: <strong>{{ maxSize // (1024 * 1024) }} MB</strong></p>
+    <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" class="space-y-4">
+        <input type="file" name="file"
+               accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.wav,.mp3,.html,.csv,.json,.xml" required
+               class="w-full p-2 border border-gray-300 rounded-md">
+        <button id="uploadButton" type="submit"
+                class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition duration-200">Upload
+        </button>
+    </form>
+    <div id="progress" class="mt-4 text-center"></div>
+    <button id="downloadButton" class="hidden text-blue-600 mt-4" download>Download Markdown</button>
+    <div id="error-message" class="text-red-600 text-center mt-4 hidden"></div>
+</div>
+
+<div id="cachedFilesContainer" class="mt-4 w-full max-w-md">
+    <h2 class="text-lg font-semibold mb-2">Processed Files</h2>
+    <ul id="cachedFiles" class="list-disc list-inside space-y-2"></ul>
+</div>
+
+<script>
+    const socket = io();
+
+    // 连接成功
+    socket.on('connect', function () {
+        console.log('Connected to server.');
+    });
+
+    $(document).ready(function () {
+        $('#uploadForm').on('submit', function (e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            $('#uploadButton').prop('disabled', true).text('Processing...');
+
+            $.ajax({
+                url: '/upload',
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function (response) {
+                    $('#progress').text('File is being processed...');
+                },
+                error: function (xhr) {
+                    $('#uploadButton').prop('disabled', false).text('Upload');
+                    $('#progress').text(''); // Clear progress message
+                    const errorMessage = xhr.responseJSON.message || 'An error occurred';
+                    displayErrorMessage(errorMessage);
+                }
+            });
+        });
+
+        socket.on('process_complete', function (data) {
+            $('#progress').text('Conversion completed!'); // Update to completion message
+
+            // Add download button and delete button
+            const downloadButton = `
+                <button class="downloadBtn text-blue-600 mt-4" data-url="${data.url}">Download Markdown (${data.unique_id})</button>
+                <button class="deleteBtn text-red-600 mt-4 ml-2" data-id="${data.unique_id}">Delete</button>`;
+            $('#cachedFiles').append(`<li class="flex items-center">${downloadButton}</li>`);
+
+            $('#uploadButton').prop('disabled', false).text('Upload');
+
+            // Cache processed file
+            cacheProcessedFile(data.unique_id, data.url);
+        });
+
+        socket.on('response', function (data) {
+            console.log(data.message);
+        });
+
+        // Check cache on page load
+        updateCachedFilesList();
+
+        // Event delegation for download and delete button clicks
+        $(document).on('click', '.downloadBtn', function () {
+            const url = $(this).data('url');
+            fetch(url, {method: 'HEAD'})
+                .then(response => {
+                    if (response.status === 404) {
+                        // Resource not found, remove cache
+                        const uniqueId = $(this).text().match(/\((.*?)\)/)[1];
+                        removeCachedFile(uniqueId);
+                        displayErrorMessage('File not found, cache cleared.');
+                    } else {
+                        // Resource exists, perform download
+                        window.location.href = url;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error checking file:', err);
+                    displayErrorMessage('Error checking file. Please try again.');
+                });
+        });
+
+        // Handle delete button click
+        $(document).on('click', '.deleteBtn', function () {
+            const uniqueId = $(this).data('id');
+            removeCachedFile(uniqueId); // Remove from localStorage
+            $(this).parent().remove(); // Remove entry from DOM
+        });
+    });
+
+    function cacheProcessedFile(unique_id, url) {
+        const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
+        const originalFilename = $("input[type=file]").get(0).files[0].name; // Get original filename
+        filesCache[unique_id] = {url: url, filename: originalFilename}; // Store file URL and original filename
+        localStorage.setItem('processedFiles', JSON.stringify(filesCache));
+        updateCachedFilesList();
+    }
+
+    function removeCachedFile(unique_id) {
+        const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
+        delete filesCache[unique_id]; // Delete corresponding cache
+        localStorage.setItem('processedFiles', JSON.stringify(filesCache));
+        updateCachedFilesList(); // Update file list
+    }
+
+    function updateCachedFilesList() {
+        const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
+        const cachedFilesContainer = $('#cachedFiles');
+        cachedFilesContainer.empty(); // Clear current list
+
+        for (const [key, data] of Object.entries(filesCache)) {
+            const listItem = `
+                <li class="flex items-center">
+                    <button class="downloadBtn text-blue-600 hover:underline" data-url="${data.url}">File ${key} (${data.filename})</button>
+                    <button class="deleteBtn text-red-600 ml-2" data-id="${key}">Delete</button>
+                </li>`; // Display filename and delete button
+            cachedFilesContainer.append(listItem);
+        }
+    }
+
+    function displayErrorMessage(message) {
+        $('#error-message').text(message).removeClass('hidden');
+        // Provide focus for improved accessibility
+        setTimeout(() => {
+            $('#error-message').fadeOut(); // Automatically hide message after a few seconds
+        }, 5000);
+    }
+</script>
+
+</body>
+
+</html>

@@ -1,0 +1,16 @@
+Flask~=3.1.0
+flask-socketio
+Flask-Caching
+Werkzeug~=3.1.3
+markitdown~=0.0.1a3
+redis~=5.2.1
+celery~=5.4.0
+python-dotenv~=1.0.1
+eventlet
+apscheduler~=3.11.0
+python-docx
+PyPDF2~=3.0.1
+pillow~=11.0.0
+openpyxl~=3.1.5
+docx~=0.2.4
+gunicorn
