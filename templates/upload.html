@@ -17,7 +17,7 @@
     <h2> Convert to Markdown</h2>
     <p>允许上传的文件类型:</p>
     <p>
-    {% for extension in allowedType %}
+    {% for extension in allowed_mime_types %}
         {{ extension }} {% if not loop.last %}| {% endif %}
     {% endfor %}
     </p>
@@ -37,7 +37,6 @@
 </div>
 
 <div id="cachedFilesContainer" class="mt-4 w-full max-w-md">
-    <h2 class="text-lg font-semibold mb-2">Processed Files</h2>
     <ul id="cachedFiles" class="list-disc list-inside space-y-2"></ul>
 </div>
 
