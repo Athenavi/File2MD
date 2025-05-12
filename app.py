@@ -2,11 +2,9 @@ import atexit
 import glob
 import logging
 import os
-import signal
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from functools import wraps
 from queue import Queue
 from threading import Lock
 
@@ -224,28 +222,6 @@ def cleanup_file(file_path):
         logging.error(f"Cleanup failed: {str(e)}", extra={'path': os.path.basename(file_path)})
 
 
-# 超时装饰器
-def timeout(seconds):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            def handler(signum, frame):
-                raise TimeoutError(f"Operation timed out after {seconds} seconds")
-
-            signal.signal(signal.SIGALRM, handler)
-            signal.alarm(seconds)
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                signal.alarm(0)
-            return result
-
-        return wrapper
-
-    return decorator
-
-
-@timeout(app.config['CONVERSION_TIMEOUT'])
 def handle_conversion(file_path, unique_id):
     """处理文件转换的核心逻辑"""
     try:
@@ -301,7 +277,6 @@ def handle_conversion(file_path, unique_id):
 
 if redis_available:
     @celery.task(bind=True)
-    @timeout(app.config['CONVERSION_TIMEOUT'])
     def async_conversion_task(self, file_path, unique_id):
         """Celery异步任务"""
         try:

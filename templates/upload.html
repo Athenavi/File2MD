@@ -158,9 +158,9 @@
                         handleFileSelection(e.originalEvent.dataTransfer.files[0]);
                     });
 
-            // 修复点击处理
             dropZone.on('click', function (e) {
-                if (e.target === this || $(e.target).closest('.drag-drop-content').length) {
+                // 只有当点击在拖放区域本身时才触发
+                if (e.target === this || $(e.target).hasClass('drag-drop-content')) {
                     fileInput.trigger('click');
                 }
             });
@@ -185,7 +185,6 @@
 
             // 文件大小验证
             const maxSize = {{maxSize}}
-
             if (file.size > maxSize) {
                 displayErrorMessage(`文件大小超过限制 (最大 ${maxSize/(1024 * 1024)}MB)`);
                 return;
@@ -311,9 +310,9 @@
         // Process completion handler
         socket.on('process_complete', function (data) {
             progress.text('Conversion completed!');
-            resetUploadButton();
-            resetFileSelection();
-            cacheProcessedFile(data.unique_id, data.url);
+            resetFileSelection(); // 清除文件选择
+            cacheProcessedFile(data.unique_id, data.url); // 缓存处理后的文件
+            updateCachedFilesList()
         });
 
         // Socket response handler
