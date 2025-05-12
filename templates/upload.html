@@ -8,192 +8,254 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        .dragover {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+
+        .file-card {
+            transition: all 0.2s ease;
+        }
+
+        .drag-drop-content {
+            pointer-events: none;
+        }
+
+        #selectedFile {
+            pointer-events: auto;
+        }
+    </style>
 </head>
 
 <body class="bg-gray-50 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-3xl">
-        <!-- Main Card -->
-        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-            <!-- Header Section -->
-            <div class="p-6 bg-gradient-to-r from-blue-500 to-blue-600">
-                <h1 class="text-2xl font-bold text-white">File2MD Converter</h1>
-                <p class="text-blue-100 mt-1">Transform your files into Markdown instantly</p>
-            </div>
+<div class="container mx-auto px-4 py-8 max-w-3xl">
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- Header -->
+        <div class="p-6 bg-gradient-to-r from-blue-500 to-blue-600">
+            <h1 class="text-2xl font-bold text-white">File2MD Converter</h1>
+            <p class="text-blue-100 mt-1">Transform your files into Markdown instantly</p>
+        </div>
 
-            <!-- Main Content -->
-            <div class="p-6 space-y-6">
-                <!-- Upload Section -->
-                <section class="space-y-4">
-                    <div class="space-y-2">
-                        <h2 class="text-lg font-semibold text-gray-700">Upload File</h2>
-                        <div class="bg-blue-50 p-4 rounded-lg">
-                            <p class="text-sm text-blue-800">
-                                Supported formats:
-                                {% for ext in allowed_mime_types %}
-                                <span class="font-mono">{{ ext }}</span>{% if not loop.last %}, {% endif %}
-                                {% endfor %}
-                            </p>
-                            <p class="text-sm text-blue-800 mt-1">
-                                Max size: {{ maxSize//(1024 * 1024) }}MB
-                            </p>
+        <!-- Main Content -->
+        <div class="p-6 space-y-6">
+            <!-- Upload Section -->
+            <section class="space-y-4">
+                <div class="space-y-2">
+                    <h2 class="text-lg font-semibold text-gray-700">Upload File</h2>
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <p class="text-sm text-blue-800">
+                            Supported formats:
+                            {% for ext in allowed_mime_types %}
+                            <span class="font-mono">{{ ext }}</span>{% if not loop.last %}, {% endif %}
+                            {% endfor %}
+                        </p>
+                        <p class="text-sm text-blue-800 mt-1">
+                            Max size: {{ maxSize//(1024 * 1024) }}MB
+                        </p>
+                    </div>
+                </div>
+
+                <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" class="space-y-4">
+                    <!-- File Upload Container -->
+                    <div class="file-upload-container">
+                        <!-- Drag & Drop Zone -->
+                        <div id="dropZone"
+                             class="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                            <div class="drag-drop-content text-center">
+                                <svg class="w-8 h-8 text-gray-400 mb-2 mx-auto" fill="none" stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                                <p class="text-sm text-gray-600">
+                                    <span class="text-blue-600 font-medium">Choose file</span> or drag and drop
+                                </p>
+                                <input type="file" name="file" id="fileInput" class="hidden"
+                                       accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.wav,.mp3,.html,.csv,.json,.xml"
+                                       required/>
+                            </div>
+                        </div>
+
+                        <!-- Selected File Display -->
+                        <div id="selectedFile"
+                             class="hidden items-center justify-between bg-gray-50 p-4 rounded-lg mt-4 file-card">
+                            <div class="flex items-center truncate">
+                                <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                <span class="text-gray-700 truncate" id="fileName"></span>
+                            </div>
+                            <button type="button" id="clearSelection" class="text-red-500 hover:text-red-600 ml-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
 
-                    <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" class="space-y-4">
-                        <div class="flex items-center justify-center w-full">
-                            <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
-                                <input type="file" name="file"
-                                       accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.wav,.mp3,.html,.csv,.json,.xml"
-                                       class="hidden" required />
-                                <div class="flex flex-col items-center">
-                                    <svg class="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                                    </svg>
-                                    <p class="text-sm text-gray-600">
-                                        <span class="text-blue-600 font-medium">Choose file</span> or drag and drop
-                                    </p>
-                                </div>
-                            </label>
-                        </div>
-                        <button id="uploadButton" type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-transform transform hover:scale-[1.02]">
-                            Start Conversion
-                        </button>
-                    </form>
-                </section>
+                    <button id="uploadButton" type="submit"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-transform transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed">
+                        Start Conversion
+                    </button>
+                </form>
+            </section>
 
-                <!-- Progress & Error Section -->
-                <div id="progress" class="text-center text-sm text-gray-500"></div>
-                <div id="error-message" class="text-red-600 text-center text-sm hidden p-3 bg-red-50 rounded-lg"></div>
+            <!-- Progress & Error Section -->
+            <div id="progress" class="text-center text-sm text-gray-500"></div>
+            <div id="error-message" class="text-red-600 text-center text-sm hidden p-3 bg-red-50 rounded-lg"></div>
 
-                <!-- Recent Files Section -->
-                <section class="border-t pt-6">
-                    <h3 class="font-medium text-gray-700 mb-4">Recent Conversions</h3>
-                    <ul id="cachedFiles" class="space-y-3">
-                        <!-- Dynamic content from cache -->
-                    </ul>
-                </section>
-            </div>
+            <!-- Recent Files Section -->
+            <section class="border-t pt-6">
+                <h3 class="font-medium text-gray-700 mb-4">Recent Conversions</h3>
+                <ul id="cachedFiles" class="space-y-3">
+                    <!-- Dynamic content from cache -->
+                </ul>
+            </section>
         </div>
     </div>
+</div>
 
 <script>
     const socket = io();
 
-    // Connection handler
-    socket.on('connect', function() {
-        console.log('Connected to server.');
-    });
+    $(document).ready(function () {
+        // 元素初始化
+        const dropZone = $('#dropZone');
+        const fileInput = $('#fileInput');
+        const selectedFile = $('#selectedFile');
+        const fileName = $('#fileName');
+        const clearSelection = $('#clearSelection');
+        const uploadButton = $('#uploadButton');
+        const progress = $('#progress');
+        const errorMessage = $('#error-message');
+        const cachedFiles = $('#cachedFiles');
+        const uploadForm = $('#uploadForm');
 
-    $(document).ready(function() {
-        // Initialize cached files list
-        updateCachedFilesList();
+        // 修复的拖放初始化
+        function initDragDrop() {
+            // 阻止默认拖放行为
+            $(document).on('dragover dragenter', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            });
 
-        // File upload form handler
-        $('#uploadForm').on('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            $('#uploadButton')
-                .prop('disabled', true)
-                .html('<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...');
-            $('#progress').text('Uploading and processing your file...');
-            $('#error-message').addClass('hidden');
+            // 拖放区域处理
+            dropZone
+                    .on('dragover', function (e) {
+                        e.preventDefault();
+                        $(this).addClass('dragover');
+                    })
+                    .on('dragleave', function (e) {
+                        $(this).removeClass('dragover');
+                    })
+                    .on('drop', function (e) {
+                        e.preventDefault();
+                        $(this).removeClass('dragover');
+                        handleFileSelection(e.originalEvent.dataTransfer.files[0]);
+                    });
 
-            $.ajax({
-                url: '/upload',
-                type: 'POST',
-                data: formData,
-                contentType: false,
-                processData: false,
-                success: function(response) {
-                    $('#progress').text('File is being processed...');
-                },
-                error: function(xhr) {
-                    resetUploadButton();
-                    $('#progress').text('');
-                    const errorMessage = xhr.responseJSON?.message || 'An error occurred during upload';
-                    displayErrorMessage(errorMessage);
+            // 修复点击处理
+            dropZone.on('click', function (e) {
+                if (e.target === this || $(e.target).closest('.drag-drop-content').length) {
+                    fileInput.trigger('click');
                 }
             });
-        });
 
-        // Process completion handler
-        socket.on('process_complete', function(data) {
-            $('#progress').text('Conversion completed!');
-            resetUploadButton();
-            cacheProcessedFile(data.unique_id, data.url);
-            updateCachedFilesList();
-        });
+            // 文件输入处理
+            fileInput.on('change', function () {
+                if (this.files.length > 0) {
+                    handleFileSelection(this.files[0]);
+                }
+            });
 
-        // Socket response handler
-        socket.on('response', function(data) {
-            console.log(data.message);
-        });
-
-        // Download button handler
-        $(document).on('click', '.downloadBtn', function() {
-            const url = $(this).data('url');
-            fetch(url, { method: 'HEAD' })
-                .then(response => {
-                    if (response.status === 404) {
-                        const uniqueId = $(this).closest('li').find('.deleteBtn').data('id');
-                        removeCachedFile(uniqueId);
-                        displayErrorMessage('File not found, cache cleared.');
-                    } else {
-                        window.location.href = url;
-                    }
-                })
-                .catch(err => {
-                    console.error('Error checking file:', err);
-                    displayErrorMessage('Error checking file. Please try again.');
-                });
-        });
-
-        // Delete button handler
-        $(document).on('click', '.deleteBtn', function(e) {
-            e.stopPropagation();
-            const uniqueId = $(this).data('id');
-            removeCachedFile(uniqueId);
-            $(this).closest('li').remove();
-        });
-
-        // Helper functions
-        function resetUploadButton() {
-            $('#uploadButton')
-                .prop('disabled', false)
-                .html('Start Conversion');
+            // 清除选择
+            clearSelection.on('click', function (e) {
+                e.stopPropagation();
+                resetFileSelection();
+            });
         }
 
+        // 文件选择处理
+        function handleFileSelection(file) {
+            if (!file) return;
+
+            // 文件大小验证
+            const maxSize = {{maxSize}}
+
+            if (file.size > maxSize) {
+                displayErrorMessage(`文件大小超过限制 (最大 ${maxSize/(1024 * 1024)}MB)`);
+                return;
+            }
+
+            // 更新界面
+            fileName.text(file.name);
+            dropZone.hide();
+            selectedFile.removeClass('hidden');
+            uploadButton.prop('disabled', false);
+
+            // 更新文件输入
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            fileInput[0].files = dataTransfer.files;
+        }
+
+        // 重置选择
+        function resetFileSelection() {
+            fileInput.val('');
+            selectedFile.addClass('hidden');
+            dropZone.show();
+            uploadButton.prop('disabled', true);
+            progress.text('');
+        }
+
+        // Cache processed file
         function cacheProcessedFile(unique_id, url) {
             const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
-            const originalFilename = $("input[type=file]").get(0).files[0]?.name || 'Converted File';
-            filesCache[unique_id] = { url: url, filename: originalFilename };
+            const file = fileInput[0].files[0];
+            filesCache[unique_id] = {
+                url: url,
+                filename: file ? file.name : 'Converted File',
+                timestamp: new Date().toISOString()
+            };
             localStorage.setItem('processedFiles', JSON.stringify(filesCache));
+            updateCachedFilesList();
         }
 
+        // Remove cached file
         function removeCachedFile(unique_id) {
             const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
             delete filesCache[unique_id];
             localStorage.setItem('processedFiles', JSON.stringify(filesCache));
         }
 
+        // Update cached files list
         function updateCachedFilesList() {
             const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
-            const cachedFilesContainer = $('#cachedFiles');
-            cachedFilesContainer.empty();
+            cachedFiles.empty();
 
             if (Object.keys(filesCache).length === 0) {
-                cachedFilesContainer.append(
-                    '<li class="text-center text-gray-500 py-4">No recent conversions</li>'
+                cachedFiles.append(
+                        '<li class="text-center text-gray-500 py-4">No recent conversions</li>'
                 );
                 return;
             }
 
-            for (const [key, data] of Object.entries(filesCache)) {
-                cachedFilesContainer.append(`
-                    <li class="flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors">
-                        <div class="truncate flex-1">
-                            <span class="text-gray-700">${data.filename}</span>
-                            <span class="text-xs text-gray-400 ml-2">${key}</span>
+            // Sort by timestamp (newest first)
+            const sortedFiles = Object.entries(filesCache)
+                    .sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp));
+
+            sortedFiles.forEach(([key, data]) => {
+                cachedFiles.append(`
+                    <li class="flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors file-card">
+                        <div class="flex items-center truncate flex-1">
+                            <svg class="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <span class="text-gray-700 truncate">${data.filename}</span>
                         </div>
                         <div class="flex space-x-2">
                             <button class="downloadBtn px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium" data-url="${data.url}">
@@ -207,16 +269,88 @@
                         </div>
                     </li>`
                 );
-            }
+            });
         }
 
-        function displayErrorMessage(message) {
-            const $errorMessage = $('#error-message');
-            $errorMessage.text(message).removeClass('hidden');
-            setTimeout(() => {
-                $errorMessage.fadeOut();
-            }, 5000);
-        }
+        // Initialize drag and drop
+        initDragDrop();
+
+        // Form submission
+        uploadForm.on('submit', function (e) {
+            e.preventDefault();
+            if (!fileInput[0].files.length) {
+                displayErrorMessage('Please select a file first');
+                return;
+            }
+
+            const formData = new FormData(this);
+            uploadButton
+                    .prop('disabled', true)
+                    .html('<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...');
+            progress.text('Uploading and processing your file...');
+            errorMessage.addClass('hidden');
+
+            $.ajax({
+                url: '/upload',
+                type: 'POST',
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function (response) {
+                    progress.text('File is being processed...');
+                },
+                error: function (xhr) {
+                    resetUploadButton();
+                    progress.text('');
+                    const errorMsg = xhr.responseJSON?.message || 'An error occurred during upload';
+                    displayErrorMessage(errorMsg);
+                }
+            });
+        });
+
+        // Process completion handler
+        socket.on('process_complete', function (data) {
+            progress.text('Conversion completed!');
+            resetUploadButton();
+            resetFileSelection();
+            cacheProcessedFile(data.unique_id, data.url);
+        });
+
+        // Socket response handler
+        socket.on('response', function (data) {
+            console.log('Server message:', data.message);
+        });
+
+        // Download button handler
+        $(document).on('click', '.downloadBtn', function () {
+            const url = $(this).data('url');
+            fetch(url, {method: 'HEAD'})
+                    .then(response => {
+                        if (response.status === 404) {
+                            const uniqueId = $(this).siblings('.deleteBtn').data('id');
+                            removeCachedFile(uniqueId);
+                            displayErrorMessage('File not found, cache cleared.');
+                            $(this).closest('li').remove();
+                        } else {
+                            window.location.href = url;
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error checking file:', err);
+                        displayErrorMessage('Error checking file. Please try again.');
+                    });
+        });
+
+        // Delete button handler
+        $(document).on('click', '.deleteBtn', function (e) {
+            e.stopPropagation();
+            const uniqueId = $(this).data('id');
+            removeCachedFile(uniqueId);
+            $(this).closest('li').remove();
+        });
+
+        // Initialize cached files list
+        updateCachedFilesList();
     });
 </script>
 
