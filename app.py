@@ -22,7 +22,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_socketio import SocketIO
 from markitdown import MarkItDown
-from werkzeug.utils import send_file
+from werkzeug.utils import send_file, secure_filename
 
 # 初始化环境变量
 dotenv.load_dotenv()
@@ -222,7 +222,7 @@ def cleanup_file(file_path):
         logging.error(f"Cleanup failed: {str(e)}", extra={'path': os.path.basename(file_path)})
 
 
-def handle_conversion(file_path, unique_id):
+def handle_conversion(file_path, unique_id, original_filename):
     """处理文件转换的核心逻辑"""
     try:
         logging.info(f"Starting conversion: {os.path.basename(file_path)}")
@@ -236,6 +236,7 @@ def handle_conversion(file_path, unique_id):
 
         cache.set(unique_id, {
             'status': 'completed',
+            'original_name': original_filename,
             'path': output_path,
             'timestamp': time.time()
         })
@@ -244,6 +245,7 @@ def handle_conversion(file_path, unique_id):
         logging.info(f"Conversion completed in {duration:.2f}s: {os.path.basename(file_path)}")
         socketio.emit('process_complete', {
             'unique_id': unique_id,
+            'original_name': original_filename,
             'url': f"/download/{unique_id}",
             'duration': duration
         })
@@ -252,11 +254,13 @@ def handle_conversion(file_path, unique_id):
         logging.error(error_msg)
         cache.set(unique_id, {
             'status': 'failed',
+            'original_name': original_filename,
             'error': error_msg,
             'timestamp': time.time()
         })
         socketio.emit('process_complete', {
             'unique_id': unique_id,
+            'original_name': original_filename,
             'error': error_msg
         })
     except Exception as e:
@@ -265,10 +269,12 @@ def handle_conversion(file_path, unique_id):
         cache.set(unique_id, {
             'status': 'failed',
             'error': error_msg,
+            'original_name': original_filename,
             'timestamp': time.time()
         })
         socketio.emit('process_complete', {
             'unique_id': unique_id,
+            'original_name': original_filename,
             'error': error_msg
         })
     finally:
@@ -348,6 +354,7 @@ def upload_file():
         if not is_file_content_valid(temp_path):
             raise ValueError("Invalid file content")
 
+        original_filename = file.filename
         cache.set(unique_id, {
             'status': 'processing',
             'path': temp_path,
@@ -357,7 +364,7 @@ def upload_file():
         if redis_available:
             async_conversion_task.delay(temp_path, unique_id)
         else:
-            executor.submit(handle_conversion, temp_path, unique_id)
+            executor.submit(handle_conversion, temp_path, unique_id, original_filename)
 
         return jsonify(status='success', unique_id=unique_id)
 

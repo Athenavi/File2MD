@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/html">
 
 <head>
     <meta charset="UTF-8">
@@ -118,12 +118,10 @@
         </div>
     </div>
 </div>
-
 <script>
     const socket = io();
-
     $(document).ready(function () {
-        // 元素初始化
+        // Element initialization
         const dropZone = $('#dropZone');
         const fileInput = $('#fileInput');
         const selectedFile = $('#selectedFile');
@@ -135,15 +133,15 @@
         const cachedFiles = $('#cachedFiles');
         const uploadForm = $('#uploadForm');
 
-        // 修复的拖放初始化
+        // Fix drag and drop initialization
         function initDragDrop() {
-            // 阻止默认拖放行为
+            // Prevent default drag and drop behavior
             $(document).on('dragover dragenter', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
             });
 
-            // 拖放区域处理
+            // Drag and drop area handling
             dropZone
                     .on('dragover', function (e) {
                         e.preventDefault();
@@ -159,50 +157,52 @@
                     });
 
             dropZone.on('click', function (e) {
-                // 只有当点击在拖放区域本身时才触发
+                // Trigger only when clicking on the drop zone itself
                 if (e.target === this || $(e.target).hasClass('drag-drop-content')) {
                     fileInput.trigger('click');
                 }
             });
 
-            // 文件输入处理
+            // File input handling
             fileInput.on('change', function () {
                 if (this.files.length > 0) {
                     handleFileSelection(this.files[0]);
                 }
             });
 
-            // 清除选择
+            // Clear selection
             clearSelection.on('click', function (e) {
                 e.stopPropagation();
                 resetFileSelection();
             });
         }
 
-        // 文件选择处理
+        // File selection handling
         function handleFileSelection(file) {
             if (!file) return;
 
-            // 文件大小验证
-            const maxSize = {{maxSize}}
+            // File size validation
+            const maxSize = {{maxSize}};
             if (file.size > maxSize) {
-                displayErrorMessage(`文件大小超过限制 (最大 ${maxSize/(1024 * 1024)}MB)`);
+                displayErrorMessage(`File size exceeds limit (max ${maxSize / (1024 * 1024)}MB)`);
                 return;
             }
 
-            // 更新界面
+            // Update interface
             fileName.text(file.name);
             dropZone.hide();
             selectedFile.removeClass('hidden');
             uploadButton.prop('disabled', false);
 
-            // 更新文件输入
+            // Update file input
             const dataTransfer = new DataTransfer();
             dataTransfer.items.add(file);
             fileInput[0].files = dataTransfer.files;
+            const tempId = 'temp-' + Date.now();
+            cacheProcessedFile(tempId, '', file.name);
         }
 
-        // 重置选择
+        // Reset selection
         function resetFileSelection() {
             fileInput.val('');
             selectedFile.addClass('hidden');
@@ -212,16 +212,14 @@
         }
 
         // Cache processed file
-        function cacheProcessedFile(unique_id, url) {
+        function cacheProcessedFile(unique_id, url, filename) {
             const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
-            const file = fileInput[0].files[0];
             filesCache[unique_id] = {
                 url: url,
-                filename: file ? file.name : 'Converted File',
+                filename: filename || 'Unknown file',
                 timestamp: new Date().toISOString()
             };
             localStorage.setItem('processedFiles', JSON.stringify(filesCache));
-            updateCachedFilesList();
         }
 
         // Remove cached file
@@ -249,24 +247,24 @@
 
             sortedFiles.forEach(([key, data]) => {
                 cachedFiles.append(`
-                    <li class="flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors file-card">
-                        <div class="flex items-center truncate flex-1">
-                            <svg class="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                <li class="flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors file-card">
+                    <div class="flex items-center truncate flex-1">
+                        <svg class="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span class="text-gray-700 truncate">${data.filename}</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="downloadBtn px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium" data-url="${data.url}">
+                            Download
+                        </button>
+                        <button class="deleteBtn p-1 text-red-500 hover:text-red-600 rounded-full hover:bg-red-50" data-id="${key}" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                             </svg>
-                            <span class="text-gray-700 truncate">${data.filename}</span>
-                        </div>
-                        <div class="flex space-x-2">
-                            <button class="downloadBtn px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium" data-url="${data.url}">
-                                Download
-                            </button>
-                            <button class="deleteBtn p-1 text-red-500 hover:text-red-600 rounded-full hover:bg-red-50" data-id="${key}" title="Delete">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </li>`
+                        </button>
+                    </div>
+                </li>`
                 );
             });
         }
@@ -277,6 +275,10 @@
         // Form submission
         uploadForm.on('submit', function (e) {
             e.preventDefault();
+
+            const tempFiles = JSON.parse(localStorage.getItem('processedFiles')) || {};
+            const tempEntry = Object.entries(tempFiles).find(([k, v]) => v.url === '');
+            const realFilename = tempEntry ? tempEntry[1].filename : 'Unknown file';
             if (!fileInput[0].files.length) {
                 displayErrorMessage('Please select a file first');
                 return;
@@ -297,6 +299,10 @@
                 processData: false,
                 success: function (response) {
                     progress.text('File is being processed...');
+                    // Update formal cache record
+                    cacheProcessedFile(response.unique_id, '', realFilename);
+                    // Clear temporary record
+                    if (tempEntry) removeCachedFile(tempEntry[0]);
                 },
                 error: function (xhr) {
                     resetUploadButton();
@@ -307,13 +313,63 @@
             });
         });
 
-        // Process completion handler
-        socket.on('process_complete', function (data) {
-            progress.text('Conversion completed!');
-            resetFileSelection(); // 清除文件选择
-            cacheProcessedFile(data.unique_id, data.url); // 缓存处理后的文件
-            updateCachedFilesList()
+        // Processing completion handler
+        socket.on('processing_progress', function (data) {
+            // Real-time update of processing progress
+            const progressPercent = Math.floor((data.current / data.total) * 100);
+            progress.html(`
+            <div class="flex items-center">
+                <span class="mr-2">Processing...</span>
+                <div class="w-24 bg-gray-200 rounded-full h-2">
+                    <div class="bg-blue-500 h-2 rounded-full" style="width: ${progressPercent}%"></div>
+                </div>
+                <span class="ml-2">${progressPercent}%</span>
+            </div>
+        `);
         });
+
+        socket.on('conversion_error', function (data) {
+            // Error handling
+            progress.text('');
+            uploadButton.prop('disabled', false).html('Convert to Markdown');
+            displayErrorMessage(data.error || 'An unknown error occurred during conversion');
+            removeCachedFile(data.unique_id); // Clear invalid cache
+        });
+
+        // Updated process_complete handler
+        socket.on('process_complete', function (data) {
+            if (data.error) {
+                // Failure handling
+                progress.text('');
+                uploadButton.prop('disabled', false).html('Convert to Markdown');
+                displayErrorMessage(data.error);
+                removeCachedFile(data.unique_id);
+            } else {
+                // Success handling
+                progress.text('Conversion completed!');
+                uploadButton.prop('disabled', false).html('Convert to Markdown');
+                cacheProcessedFile(
+                        data.unique_id,
+                        data.url,
+                        data.original_name || 'Unnamed file' // Receive original file name
+                );
+                updateCachedFilesList();
+            }
+            resetFileSelection();
+        });
+
+        function displayErrorMessage(msg) {
+            errorMessage
+                    .removeClass('hidden')
+                    .html(`
+                <div class="flex items-center justify-between">
+                    <span>${msg}</span>
+                    <button onclick="location.reload()" class="ml-4 px-2 py-1 bg-red-100 text-red-600 rounded">
+                        Retry
+                    </button>
+                </div>
+            `);
+        }
 
         // Socket response handler
         socket.on('response', function (data) {
@@ -352,6 +408,5 @@
         updateCachedFilesList();
     });
 </script>
-
 </body>
 </html>
