@@ -62,12 +62,21 @@ app.config.update({
         'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'xls': 'application/vnd.ms-excel',
         'jpg': 'image/jpeg',
         'jpeg': 'image/jpeg',
         'png': 'image/png',
         'gif': 'image/gif',
         'txt': 'text/plain',
-        'md': 'text/markdown'
+        'md': 'text/markdown',
+        'csv': 'text/csv',
+        'json': 'application/json',
+        'xml': 'application/xml',
+        'html': 'text/html',
+        'zip': 'application/zip',
+        'wav': 'audio/wav',
+        'mp3': 'audio/mpeg',
+        'epub': 'application/epub+zip'
     }
 })
 
@@ -123,7 +132,7 @@ else:
         'CACHE_DEFAULT_TIMEOUT': 300
     })
 
-md = MarkItDown()
+md = MarkItDown(enable_plugins=False)  # 可根据需要启用插件
 file_status_queue = Queue()
 upload_lock = Lock()
 
@@ -222,13 +231,30 @@ def cleanup_file(file_path):
         logging.error(f"Cleanup failed: {str(e)}", extra={'path': os.path.basename(file_path)})
 
 
-def handle_conversion(file_path, unique_id, original_filename):
+def handle_conversion(file_path, unique_id, original_filename, llm_api_key=None, llm_model='gpt-4o'):
     """处理文件转换的核心逻辑"""
     try:
         logging.info(f"Starting conversion: {os.path.basename(file_path)}")
         start_time = time.time()
 
-        result = md.convert(file_path)
+        # 根据 LLM 配置动态创建 MarkItDown 实例
+        if llm_api_key:
+            try:
+                from openai import OpenAI
+                llm_client = OpenAI(api_key=llm_api_key)
+                md_instance = MarkItDown(
+                    enable_plugins=False,
+                    llm_client=llm_client,
+                    llm_model=llm_model
+                )
+                logging.info(f"Using LLM model: {llm_model}")
+            except Exception as e:
+                logging.warning(f"Failed to initialize LLM client: {str(e)}, using default MarkItDown")
+                md_instance = MarkItDown(enable_plugins=False)
+        else:
+            md_instance = MarkItDown(enable_plugins=False)
+
+        result = md_instance.convert(file_path)
         output_path = os.path.join(app.config['OUTPUT_FOLDER'], f"{unique_id}.md")
 
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -284,9 +310,15 @@ def handle_conversion(file_path, unique_id, original_filename):
 if redis_available:
     @celery.task(bind=True)
     def async_conversion_task(self, file_path, unique_id):
-        """Celery异步任务"""
+        """Celery 异步任务"""
         try:
-            handle_conversion(file_path, unique_id)
+            # 从缓存中获取 LLM 配置
+            cache_data = cache.get(unique_id)
+            llm_api_key = cache_data.get('llm_api_key') if cache_data else None
+            llm_model = cache_data.get('llm_model', 'gpt-4o') if cache_data else 'gpt-4o'
+            original_filename = cache_data.get('original_name', 'Unknown') if cache_data else 'Unknown'
+            
+            handle_conversion(file_path, unique_id, original_filename, llm_api_key, llm_model)
             return {'status': 'completed'}
         except Exception as e:
             cache.set(unique_id, {
@@ -300,9 +332,12 @@ if redis_available:
 
 @app.route('/')
 def upload_form():
+    # 获取支持的文件格式统计
+    supported_formats = list(app.config['ALLOWED_MIME_TYPES'].keys())
     return render_template('upload.html',
                            allowed_mime_types=app.config['ALLOWED_MIME_TYPES'],
-                           maxSize=app.config['MAX_CONTENT_LENGTH'])
+                           maxSize=app.config['MAX_CONTENT_LENGTH'],
+                           supported_formats=supported_formats)
 
 
 @app.route('/download/<uuid:unique_id>')
@@ -355,16 +390,24 @@ def upload_file():
             raise ValueError("Invalid file content")
 
         original_filename = file.filename
+        
+        # 获取 LLM 配置
+        llm_api_key = request.form.get('llm_api_key', '').strip()
+        llm_model = request.form.get('llm_model', 'gpt-4o').strip()
+        
         cache.set(unique_id, {
             'status': 'processing',
             'path': temp_path,
-            'timestamp': time.time()
+            'timestamp': time.time(),
+            'original_name': original_filename,
+            'llm_api_key': llm_api_key,
+            'llm_model': llm_model
         })
 
         if redis_available:
             async_conversion_task.delay(temp_path, unique_id)
         else:
-            executor.submit(handle_conversion, temp_path, unique_id, original_filename)
+            executor.submit(handle_conversion, temp_path, unique_id, original_filename, llm_api_key, llm_model)
 
         return jsonify(status='success', unique_id=unique_id)
 
@@ -372,6 +415,28 @@ def upload_file():
         cleanup_file(temp_path)
         logging.error(f"Upload failed: {str(e)}")
         return jsonify(status='error', message='File processing failed'), 500
+
+
+@app.route('/api/status')
+def api_status():
+    """返回系统状态和支持的文件格式"""
+    return jsonify({
+        'status': 'online',
+        'version': '1.0.0',
+        'powered_by': 'MarkItDown',
+        'supported_formats': list(app.config['ALLOWED_MIME_TYPES'].keys()),
+        'max_file_size_mb': app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024),
+        'features': [
+            'PDF to Markdown',
+            'Office Documents (Word, PowerPoint, Excel)',
+            'Images with EXIF metadata',
+            'Audio files with transcription',
+            'HTML and text-based formats',
+            'ZIP archive iteration',
+            'YouTube URL support',
+            'EPub support'
+        ]
+    })
 
 
 # 后台清理任务
