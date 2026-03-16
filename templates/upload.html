@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File2MD - Smart File Converter</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <style>
@@ -30,11 +31,18 @@
 
 <body class="bg-gray-50 min-h-screen">
 <div class="container mx-auto px-4 py-8 max-w-3xl">
+    <!-- System Status Badge -->
+    <div class="flex justify-end mb-2">
+        <button id="systemStatusBtn" class="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full hover:bg-green-200 transition-colors">
+            <i class="fas fa-check-circle mr-1"></i>System Online
+        </button>
+    </div>
+    
     <div class="bg-white rounded-xl shadow-lg overflow-hidden">
         <!-- Header -->
         <div class="p-6 bg-gradient-to-r from-blue-500 to-blue-600">
-            <h1 class="text-2xl font-bold text-white">File2MD Converter</h1>
-            <p class="text-blue-100 mt-1">Transform your files into Markdown instantly</p>
+            <h1 class="text-2xl font-bold text-white"><i class="fas fa-file-export mr-2"></i>File2MD Converter</h1>
+            <p class="text-blue-100 mt-1">Transform your files into Markdown instantly - Powered by MarkItDown</p>
         </div>
 
         <!-- Main Content -->
@@ -42,21 +50,52 @@
             <!-- Upload Section -->
             <section class="space-y-4">
                 <div class="space-y-2">
-                    <h2 class="text-lg font-semibold text-gray-700">Upload File</h2>
+                    <h2 class="text-lg font-semibold text-gray-700"><i class="fas fa-upload mr-2"></i>Upload File</h2>
                     <div class="bg-blue-50 p-4 rounded-lg">
-                        <p class="text-sm text-blue-800">
-                            Supported formats:
-                            {% for ext in allowed_mime_types %}
-                            <span class="font-mono">{{ ext }}</span>{% if not loop.last %}, {% endif %}
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                            {% for ext, mime in allowed_mime_types.items() %}
+                            <div class="flex items-center bg-white px-2 py-1 rounded">
+                                <i class="fas fa-file text-blue-500 mr-1"></i>
+                                <span class="font-mono">{{ ext }}</span>
+                            </div>
                             {% endfor %}
-                        </p>
-                        <p class="text-sm text-blue-800 mt-1">
-                            Max size: {{ maxSize//(1024 * 1024) }}MB
+                        </div>
+                        <p class="text-sm text-blue-800 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>Max size: {{ maxSize//(1024 * 1024) }}MB
                         </p>
                     </div>
                 </div>
 
                 <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" class="space-y-4">
+                    <!-- LLM Configuration -->
+                    <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-robot text-purple-600 mr-2"></i>
+                            <h4 class="text-sm font-semibold text-gray-700">LLM Image Description (Optional)</h4>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">API Key</label>
+                                <input type="password" id="llmApiKey" placeholder="sk-..." 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                       autocomplete="off">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Model</label>
+                                <select id="llmModel" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                    <option value="gpt-4o">GPT-4o</option>
+                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    <option value="claude-3-opus">Claude 3 Opus</option>
+                                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            <i class="fas fa-info-circle mr-1"></i>Used for describing images in documents (PPTX, Images)
+                        </p>
+                    </div>
                     <!-- File Upload Container -->
                     <div class="file-upload-container">
                         <!-- Drag & Drop Zone -->
@@ -72,7 +111,7 @@
                                     <span class="text-blue-600 font-medium">Choose file</span> or drag and drop
                                 </p>
                                 <input type="file" name="file" id="fileInput" class="hidden"
-                                       accept=".pdf,.docx,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.wav,.mp3,.html,.csv,.json,.xml"
+                                       accept=".pdf,.docx,.pptx,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.txt,.md,.csv,.json,.xml,.html,.zip,.wav,.mp3,.epub"
                                        required/>
                             </div>
                         </div>
@@ -98,19 +137,52 @@
                     </div>
 
                     <button id="uploadButton" type="submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-transform transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed">
-                        Start Conversion
+                            class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
+                        <i class="fas fa-magic mr-2"></i>Start Conversion
                     </button>
                 </form>
             </section>
 
             <!-- Progress & Error Section -->
-            <div id="progress" class="text-center text-sm text-gray-500"></div>
+            <div id="progress" class="text-center text-sm text-gray-500 hidden"></div>
             <div id="error-message" class="text-red-600 text-center text-sm hidden p-3 bg-red-50 rounded-lg"></div>
+            
+            <!-- Features Section -->
+            <section class="border-t pt-6">
+                <h3 class="font-medium text-gray-700 mb-4"><i class="fas fa-star mr-2"></i>Features</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-green-50 p-3 rounded-lg">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-bolt text-yellow-500 mr-2"></i>
+                            <span class="font-semibold text-gray-700">Fast Conversion</span>
+                        </div>
+                        <p class="text-xs text-gray-600">Powered by MarkItDown engine</p>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-lg">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-shield-alt text-purple-500 mr-2"></i>
+                            <span class="font-semibold text-gray-700">Secure</span>
+                        </div>
+                        <p class="text-xs text-gray-600">Auto-cleanup after processing</p>
+                    </div>
+                    <div class="bg-indigo-50 p-3 rounded-lg">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-cloud-download-alt text-indigo-500 mr-2"></i>
+                            <span class="font-semibold text-gray-700">Easy Download</span>
+                        </div>
+                        <p class="text-xs text-gray-600">Instant markdown download</p>
+                    </div>
+                </div>
+            </section>
 
             <!-- Recent Files Section -->
             <section class="border-t pt-6">
-                <h3 class="font-medium text-gray-700 mb-4">Recent Conversions</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-medium text-gray-700"><i class="fas fa-history mr-2"></i>Recent Conversions</h3>
+                    <button id="clearAllCache" class="text-xs text-red-500 hover:text-red-600">
+                        <i class="fas fa-trash mr-1"></i>Clear All
+                    </button>
+                </div>
                 <ul id="cachedFiles" class="space-y-3">
                     <!-- Dynamic content from cache -->
                 </ul>
@@ -118,6 +190,30 @@
         </div>
     </div>
 </div>
+
+<!-- System Status Modal -->
+<div id="systemStatusModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>System Status
+                </h3>
+                <button id="closeModal" class="text-gray-400 hover:text-gray-500">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="mt-2 px-7 py-3">
+                <div id="modalContent" class="space-y-3">
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const socket = io();
     $(document).ready(function () {
@@ -132,6 +228,12 @@
         const errorMessage = $('#error-message');
         const cachedFiles = $('#cachedFiles');
         const uploadForm = $('#uploadForm');
+        const systemStatusBtn = $('#systemStatusBtn');
+        const systemStatusModal = $('#systemStatusModal');
+        const closeModal = $('#closeModal');
+        const modalContent = $('#modalContent');
+        const llmApiKey = $('#llmApiKey');
+        const llmModel = $('#llmModel');
 
         // Fix drag and drop initialization
         function initDragDrop() {
@@ -285,6 +387,15 @@
             }
 
             const formData = new FormData(this);
+            
+            // Add LLM configuration if provided
+            const apiKey = llmApiKey.val().trim();
+            const model = llmModel.val();
+            if (apiKey) {
+                formData.append('llm_api_key', apiKey);
+                formData.append('llm_model', model);
+            }
+            
             uploadButton
                     .prop('disabled', true)
                     .html('<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...');
@@ -331,31 +442,9 @@
         socket.on('conversion_error', function (data) {
             // Error handling
             progress.text('');
-            uploadButton.prop('disabled', false).html('Convert to Markdown');
+            uploadButton.prop('disabled', false).html('<i class="fas fa-magic mr-2"></i>Convert to Markdown');
             displayErrorMessage(data.error || 'An unknown error occurred during conversion');
             removeCachedFile(data.unique_id); // Clear invalid cache
-        });
-
-        // Updated process_complete handler
-        socket.on('process_complete', function (data) {
-            if (data.error) {
-                // Failure handling
-                progress.text('');
-                uploadButton.prop('disabled', false).html('Convert to Markdown');
-                displayErrorMessage(data.error);
-                removeCachedFile(data.unique_id);
-            } else {
-                // Success handling
-                progress.text('Conversion completed!');
-                uploadButton.prop('disabled', false).html('Convert to Markdown');
-                cacheProcessedFile(
-                        data.unique_id,
-                        data.url,
-                        data.original_name || 'Unnamed file' // Receive original file name
-                );
-                updateCachedFilesList();
-            }
-            resetFileSelection();
         });
 
         function displayErrorMessage(msg) {
@@ -374,6 +463,28 @@
         // Socket response handler
         socket.on('response', function (data) {
             console.log('Server message:', data.message);
+        });
+
+        // Processing complete handler with visual feedback
+        socket.on('process_complete', function (data) {
+            if (data.error) {
+                // Failure handling
+                progress.text('');
+                uploadButton.prop('disabled', false).html('<i class="fas fa-magic mr-2"></i>Convert to Markdown');
+                displayErrorMessage(data.error);
+                removeCachedFile(data.unique_id);
+            } else {
+                // Success handling with success icon
+                progress.html('<i class="fas fa-check-circle text-green-600 mr-2"></i>Conversion completed successfully!');
+                uploadButton.prop('disabled', false).html('<i class="fas fa-magic mr-2"></i>Convert to Markdown');
+                cacheProcessedFile(
+                        data.unique_id,
+                        data.url,
+                        data.original_name || 'Unnamed file' // Receive original file name
+                );
+                updateCachedFilesList();
+            }
+            resetFileSelection();
         });
 
         // Download button handler
@@ -404,8 +515,85 @@
             $(this).closest('li').remove();
         });
 
+        // Clear all cache handler
+        $('#clearAllCache').on('click', function () {
+            if (confirm('Are you sure you want to clear all cached files?')) {
+                localStorage.removeItem('processedFiles');
+                updateCachedFilesList();
+            }
+        });
+
         // Initialize cached files list
         updateCachedFilesList();
+
+        // System status modal handler
+        systemStatusBtn.on('click', function () {
+            loadSystemStatus();
+        });
+
+        closeModal.on('click', function () {
+            systemStatusModal.addClass('hidden');
+        });
+
+        $(window).on('click', function (e) {
+            if (e.target === systemStatusModal[0]) {
+                systemStatusModal.addClass('hidden');
+            }
+        });
+
+        // Load system status
+        function loadSystemStatus() {
+            modalContent.html(`
+                <div class="animate-pulse space-y-3">
+                    <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div class="h-4 bg-gray-200 rounded w-1/2"></div>
+                    <div class="h-4 bg-gray-200 rounded w-5/6"></div>
+                </div>
+            `);
+            systemStatusModal.removeClass('hidden');
+
+            $.get('/api/status', function (data) {
+                const formatsHtml = data.supported_formats.map(f => 
+                    `<span class="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs m-1">${f}</span>`
+                ).join('');
+
+                const featuresHtml = data.features.map(f => 
+                    `<li class="flex items-center text-sm text-gray-700"><i class="fas fa-check text-green-500 mr-2"></i>${f}</li>`
+                ).join('');
+
+                modalContent.html(`
+                    <div class="space-y-4 text-left">
+                        <div class="flex items-center justify-between bg-green-50 p-3 rounded">
+                            <span class="text-sm font-semibold text-green-700">Status: ${data.status.toUpperCase()}</span>
+                            <span class="text-xs text-green-600">v${data.version}</span>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-600 mb-2">POWERED BY</p>
+                            <p class="text-sm text-blue-600 font-medium">${data.powered_by}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-600 mb-2">MAX FILE SIZE</p>
+                            <p class="text-sm text-gray-700">${data.max_file_size_mb} MB</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-600 mb-2">SUPPORTED FORMATS</p>
+                            <div class="flex flex-wrap">${formatsHtml}</div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-gray-600 mb-2">FEATURES</p>
+                            <ul class="space-y-1">${featuresHtml}</ul>
+                        </div>
+                    </div>
+                `);
+            }).fail(function () {
+                modalContent.html(`
+                    <div class="text-red-600">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Failed to load system status
+                    </div>
+                `);
+            });
+        }
     });
 </script>
 </body>

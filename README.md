@@ -9,12 +9,16 @@
 
 ## 🌟 核心特性
 
+- **MarkItDown 引擎驱动**  
+  基于 Microsoft MarkItDown，支持 PDF、Office、图片、音频等多种格式
 - **多格式支持**  
-  PDF、DOCX、PPTX、XLSX、图片等 ➡️ Markdown转换
+  PDF、DOCX、PPTX、XLSX、XLS、图片 (JPG/PNG/GIF)、音频 (WAV/MP3)、HTML、CSV、JSON、XML、ZIP、EPub 等 ➡️ Markdown 转换
+- **智能内容提取**  
+  保留文档结构（标题、列表、表格）、EXIF 元数据、语音转录
 - **云端异步处理**  
-  Celery + Redis分布式任务队列
+  Celery + Redis 分布式任务队列
 - **实时进度推送**  
-  WebSocket实时状态更新
+  WebSocket 实时状态更新
 - **企业级安全**  
   文件签名验证 + 内容安全策略（CSP）
 - **智能资源管理**  
@@ -29,6 +33,7 @@
 ![Celery](https://img.shields.io/badge/-Celery-37814A?logo=celery)
 
 **数据处理**  
+![MarkItDown](https://img.shields.io/badge/-MarkItDown-0078D4) 
 ![PyPDF2](https://img.shields.io/badge/-PyPDF2-0066CC) 
 ![Pillow](https://img.shields.io/badge/-Pillow-3776AB?logo=python)
 
@@ -81,8 +86,29 @@ MAX_CONTENT_LENGTH=52428800  # 50MB
 # 开发模式
 python app.py
 
-# 生产模式 (需要安装gunicorn)
+# 生产模式 (需要安装 gunicorn)
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+
+## 📊 系统状态
+
+访问 `/api/status` 获取系统状态信息：
+
+```json
+{
+  "status": "online",
+  "version": "1.0.0",
+  "powered_by": "MarkItDown",
+  "supported_formats": ["pdf", "docx", "pptx", ...],
+  "max_file_size_mb": 50,
+  "features": [
+    "PDF to Markdown",
+    "Office Documents (Word, PowerPoint, Excel)",
+    "Images with EXIF metadata",
+    "Audio files with transcription",
+    ...
+  ]
+}
 ```
 
 ## 📡 API 文档
@@ -92,6 +118,11 @@ gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```http
 POST /upload
 Content-Type: multipart/form-data
+
+Parameters:
+- file: 要转换的文件
+- llm_api_key: (可选) OpenAI API Key，用于图像描述
+- llm_model: (可选) LLM 模型名称，默认 gpt-4o
 
 Response:
 {
@@ -104,12 +135,27 @@ Response:
 
 ```http
 GET /download/{uuid}
-Response: Markdown文件下载
+Response: Markdown 文件下载
+```
+
+### 系统状态
+
+```http
+GET /api/status
+Response: JSON
+{
+  "status": "online",
+  "version": "1.0.0",
+  "powered_by": "MarkItDown",
+  "supported_formats": ["pdf", "docx", ...],
+  "max_file_size_mb": 50,
+  "features": [...]
+}
 ```
 
 ### 实时状态查询
 
-通过WebSocket连接获取实时处理状态：
+通过 WebSocket 连接获取实时处理状态：
 
 ```javascript
 socket.on('process_complete', (data) => {
