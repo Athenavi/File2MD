@@ -202,10 +202,56 @@ socket.on('process_complete', (data) => {
 
 ## 🤝 贡献指南
 
-欢迎通过Issue或PR参与贡献：
+欢迎通过 Issue 或 PR 参与贡献：
 
-1. Fork项目仓库
+1. Fork 项目仓库
 2. 创建特性分支 (`git checkout -b feature/your-feature`)
 3. 提交修改 (`git commit -am 'Add some feature'`)
 4. 推送分支 (`git push origin feature/your-feature`)
-5. 创建Pull Request
+5. 创建 Pull Request
+
+## 📦 打包为 EXE（Windows）
+
+### 快速打包
+
+```bash
+# 1. 安装 PyInstaller
+pip install pyinstaller
+
+# 2. 运行测试脚本（可选但推荐）
+python test_before_build.py
+
+# 3. 运行打包脚本
+python build_exe.py
+```
+
+### 打包模式
+
+**目录模式（推荐）**
+- 生成 `dist/File2MD/` 文件夹
+- 包含所有依赖和资源文件
+- 启动快，便于调试
+- **适合分发给用户**
+
+**单一文件模式**
+- 生成 `dist/File2MD.exe` 单个文件
+- 所有依赖打包进 exe
+- 首次启动较慢
+- **适合便携使用**
+
+### 运行打包后的程序
+
+```bash
+cd dist/File2MD
+./File2MD.exe
+```
+
+然后访问 http://localhost:5000
+
+### 详细说明
+
+查看 [打包说明.md](打包说明.md) 或 [BUILD.md](BUILD.md) 获取完整文档，包括：
+- 配置选项
+- 故障排除
+- 分发注意事项
+- 高级自定义选项

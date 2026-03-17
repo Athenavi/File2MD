@@ -2,6 +2,7 @@ import atexit
 import glob
 import logging
 import os
+import sys
 import tempfile
 import time
 import uuid
@@ -27,10 +28,20 @@ from markitdown import MarkItDown
 from werkzeug.utils import send_file, secure_filename
 
 # 初始化环境变量
+# 获取打包后的资源路径
+def get_resource_path(relative_path):
+    """获取资源文件的绝对路径（支持 PyInstaller 打包）"""
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller 临时目录
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
 dotenv.load_dotenv()
 
-# 初始化Flask应用
-app = Flask(__name__)
+# 初始化 Flask 应用
+# 获取模板文件夹路径（支持打包后）
+template_folder = get_resource_path('templates')
+app = Flask(__name__, template_folder=template_folder)
 
 # 线程池执行器
 executor = ThreadPoolExecutor(max_workers=4)
@@ -52,8 +63,8 @@ def get_env_variable(var_name, default_value=None):
 
 # 应用配置
 app.config.update({
-    'UPLOAD_FOLDER': get_env_variable('UPLOAD_FOLDER', 'uploads/'),
-    'OUTPUT_FOLDER': get_env_variable('OUTPUT_FOLDER', 'output/'),
+    'UPLOAD_FOLDER': get_env_variable('UPLOAD_FOLDER', get_resource_path('uploads/')),
+    'OUTPUT_FOLDER': get_env_variable('OUTPUT_FOLDER', get_resource_path('output/')),
     'MAX_CONTENT_LENGTH': 50 * 1024 * 1024,
     'FILE_RETENTION_HOURS': int(get_env_variable('FILE_RETENTION_HOURS', '1')),
     'CONVERSION_TIMEOUT': int(get_env_variable('CONVERSION_TIMEOUT', '300')),
@@ -187,6 +198,11 @@ upload_lock = Lock()
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
+# 确保模板目录存在（打包后）
+template_folder = get_resource_path('templates')
+if not os.path.exists(template_folder):
+    logging.warning(f"Templates folder not found: {template_folder}")
+
 
 @contextmanager
 def sandboxed_file_operation(file_path):
@@ -252,15 +268,21 @@ def initial_validation(file):
 
 
 def validate_file_type(file_path):
-    """MIME类型验证"""
+    """MIME 类型验证"""
     try:
         import magic
         mime = magic.Magic(mime=True)
-        return mime.from_file(file_path) in app.config['ALLOWED_MIME_TYPES'].values()
+        detected_mime = mime.from_file(file_path)
+        logging.info(f"Detected MIME type for {os.path.basename(file_path)}: {detected_mime}")
+        return detected_mime in app.config['ALLOWED_MIME_TYPES'].values()
     except ImportError:
-        logging.warning("python-magic not available, using extension validation")
+        logging.warning("python-magic not available, using extension validation only")
         ext = file_path.split('.')[-1].lower()
-        return app.config['ALLOWED_MIME_TYPES'].get(ext) is not None
+        expected_mime = app.config['ALLOWED_MIME_TYPES'].get(ext)
+        if expected_mime:
+            logging.info(f"Using extension-based validation for .{ext}: {expected_mime}")
+            return True
+        return False
 
 
 def is_file_content_valid(file_path):
@@ -273,20 +295,44 @@ def is_file_content_valid(file_path):
             ext = file_path.split('.')[-1].lower()
 
             if ext in ('jpg', 'jpeg', 'png'):
-                with Image.open(file_path) as img:
-                    img.verify()
-                    img.load()  # 进一步验证图像数据
-                return True
+                try:
+                    with Image.open(file_path) as img:
+                        img.verify()
+                        # 重新打开图像以加载数据（verify 后需要重新加载）
+                        img.load()
+                    return True
+                except Exception as img_error:
+                    logging.error(f"Image validation failed for {os.path.basename(file_path)}: {str(img_error)}", 
+                                 extra={'path': os.path.basename(file_path)})
+                    # 尝试获取更详细的图像信息
+                    try:
+                        with Image.open(file_path) as img:
+                            logging.error(f"Image details - Format: {img.format}, Mode: {img.mode}, Size: {img.size}")
+                    except:
+                        pass
+                    return False
             elif ext == 'pdf':
-                with open(file_path, 'rb') as f:
-                    reader = PdfReader(f)
-                    return len(reader.pages) > 0 and not reader.is_encrypted
+                try:
+                    with open(file_path, 'rb') as f:
+                        reader = PdfReader(f)
+                        return len(reader.pages) > 0 and not reader.is_encrypted
+                except Exception as pdf_error:
+                    logging.error(f"PDF validation failed: {str(pdf_error)}", extra={'path': os.path.basename(file_path)})
+                    return False
             elif ext == 'docx':
-                doc = Document(file_path)
-                return len(doc.paragraphs) > 0
+                try:
+                    doc = Document(file_path)
+                    return len(doc.paragraphs) > 0
+                except Exception as docx_error:
+                    logging.error(f"DOCX validation failed: {str(docx_error)}", extra={'path': os.path.basename(file_path)})
+                    return False
             elif ext == 'xlsx':
-                wb = openpyxl.load_workbook(file_path)
-                return len(wb.sheetnames) > 0
+                try:
+                    wb = openpyxl.load_workbook(file_path)
+                    return len(wb.sheetnames) > 0
+                except Exception as xlsx_error:
+                    logging.error(f"XLSX validation failed: {str(xlsx_error)}", extra={'path': os.path.basename(file_path)})
+                    return False
             elif ext == 'txt':
                 return os.path.getsize(file_path) > 0
             return True
@@ -513,7 +559,10 @@ def upload_file():
         file.save(temp_path)
 
         if not is_file_content_valid(temp_path):
-            raise ValueError("Invalid file content")
+            # 获取更详细的错误信息（从日志中）
+            error_detail = "文件内容验证失败。请确保文件格式正确且未损坏。"
+            logging.error(f"Validation failed for uploaded file: {os.path.basename(temp_path)}")
+            raise ValueError(error_detail)
 
         original_filename = file.filename
         
@@ -537,9 +586,15 @@ def upload_file():
 
         return jsonify(status='success', unique_id=unique_id)
 
-    except Exception as e:
+    except ValueError as e:
+        error_msg = f"Validation error: {str(e)}"
+        logging.error(error_msg, extra={'path': os.path.basename(temp_path)})
         cleanup_file(temp_path)
-        logging.error(f"Upload failed: {str(e)}")
+        return jsonify(status='error', message=str(e)), 400
+    except Exception as e:
+        error_msg = f"Upload failed: {str(e)}"
+        cleanup_file(temp_path)
+        logging.error(error_msg)
         return jsonify(status='error', message='File processing failed'), 500
 
 

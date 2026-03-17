@@ -15,6 +15,7 @@ openpyxl~=3.1.5
 docx~=0.2.4
 gunicorn
 python-magic
-#python-magic-bin（Windows 下需要安装）
+python-magic-bin; sys_platform == 'win32'  # Windows 需要安装此包
 flask-limiter
 flask-cors
+pyinstaller  # 用于打包为 exe
