@@ -50,6 +50,7 @@ coverage.xml
 # PyInstaller
 *.manifest
 *.spec.bak
+# 注意：build_exe.py、launcher.py、test_before_build.py、一键打包.bat 需要保留
 
 # Logs
 *.log
