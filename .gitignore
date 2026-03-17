@@ -1,4 +1,67 @@
+# IDE
 /.idea
-/output
+
+# Python
+/__pycache__/
+/*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
 /.venv
+/.env
+
+# Flask
+instance/
+.webassets-cache
+
+# Testing
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# PyInstaller
+*.manifest
+*.spec.bak
+# 注意：build_exe.py、launcher.py、test_before_build.py、一键打包.bat 需要保留
+
+# Logs
+*.log
 app.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+/uploads/*
+!/uploads/.gitkeep
+/output/*
+!/output/.gitkeep
