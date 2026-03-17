@@ -1,250 +1,1191 @@
 <!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/html">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File2MD - Smart File Converter</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>File2MD - 智能文件转换器</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <style>
-        .dragover {
-            border-color: #3b82f6 !important;
-            background-color: #eff6ff !important;
+        /* ===== 基础变量与重置 ===== */
+        :root {
+            --primary-50: #eff6ff;
+            --primary-100: #dbeafe;
+            --primary-200: #bfdbfe;
+            --primary-300: #93c5fd;
+            --primary-400: #60a5fa;
+            --primary-500: #3b82f6;
+            --primary-600: #2563eb;
+            --primary-700: #1d4ed8;
+            
+            --success-50: #f0fdf4;
+            --success-500: #22c55e;
+            --success-600: #16a34a;
+            
+            --error-50: #fef2f2;
+            --error-500: #ef4444;
+            --error-600: #dc2626;
+            
+            --warning-50: #fffbeb;
+            --warning-500: #f59e0b;
+            
+            --purple-50: #faf5ff;
+            --purple-500: #a855f7;
+            --purple-600: #9333ea;
+            
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
 
-        .file-card {
-            transition: all 0.2s ease;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        .drag-drop-content {
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--gray-700);
+            line-height: 1.6;
+        }
+
+        /* ===== 背景装饰 ===== */
+        .bg-decoration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
         }
 
-        #selectedFile {
-            pointer-events: auto;
+        .bg-circle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .bg-circle-1 {
+            width: 300px;
+            height: 300px;
+            top: -100px;
+            right: -50px;
+            animation-delay: 0s;
+        }
+
+        .bg-circle-2 {
+            width: 200px;
+            height: 200px;
+            bottom: -50px;
+            left: -50px;
+            animation-delay: 7s;
+        }
+
+        .bg-circle-3 {
+            width: 250px;
+            height: 250px;
+            top: 50%;
+            left: 50%;
+            animation-delay: 14s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 30px) scale(0.9); }
+        }
+
+        /* ===== 主容器 ===== */
+        .container {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== 顶部状态栏 ===== */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: white;
+        }
+
+        .brand-icon {
+            width: 3rem;
+            height: 3rem;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .brand-text h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .brand-text p {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+
+        #systemStatusBtn {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        #systemStatusBtn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        #systemStatusBtn i {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* ===== 主卡片 ===== */
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 1.5rem;
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* ===== 卡片头部 ===== */
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-700) 100%);
+            padding: 2.5rem;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translate(-50%, -50%); }
+            100% { transform: translate(50%, 50%); }
+        }
+
+        .card-header h2 {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-header p {
+            font-size: 1rem;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== 卡片内容 ===== */
+        .card-body {
+            padding: 2.5rem;
+        }
+
+        /* ===== 格式标签云 ===== */
+        .formats-section {
+            margin-bottom: 2rem;
+        }
+
+        .formats-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--gray-600);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .formats-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .format-tag {
+            background: var(--primary-50);
+            color: var(--primary-700);
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid var(--primary-200);
+            transition: all 0.2s;
+        }
+
+        .format-tag:hover {
+            background: var(--primary-100);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ===== 上传区域 ===== */
+        .upload-section {
+            margin-bottom: 2rem;
+        }
+
+        .dropzone {
+            border: 3px dashed var(--gray-300);
+            border-radius: 1rem;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: var(--gray-50);
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .dropzone:hover {
+            border-color: var(--primary-400);
+            background: var(--primary-50);
+        }
+
+        .dropzone.dragover {
+            border-color: var(--primary-500);
+            background: var(--primary-100);
+            transform: scale(1.02);
+        }
+
+        .dropzone-icon {
+            width: 4rem;
+            height: 4rem;
+            margin: 0 auto 1rem;
+            background: var(--primary-100);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-600);
+            font-size: 2rem;
+            transition: all 0.3s;
+        }
+
+        .dropzone:hover .dropzone-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .dropzone-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 0.5rem;
+        }
+
+        .dropzone-hint {
+            font-size: 0.875rem;
+            color: var(--gray-500);
+        }
+
+        .dropzone-hint .highlight {
+            color: var(--primary-600);
+            font-weight: 600;
+        }
+
+        /* ===== 文件信息 ===== */
+        .file-info {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            padding: 1rem 1.25rem;
+            border-radius: 0.75rem;
+            margin-top: 1rem;
+            border: 1px solid var(--gray-200);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .file-details {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            background: var(--primary-100);
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-600);
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: var(--gray-700);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-remove {
+            background: none;
+            border: none;
+            color: var(--error-500);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-remove:hover {
+            background: var(--error-50);
+            color: var(--error-600);
+        }
+
+        /* ===== 配置选项 ===== */
+        .options-section {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (min-width: 768px) {
+            .options-section {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        .option-card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            transition: all 0.3s;
+        }
+
+        .option-card:hover {
+            border-color: var(--primary-300);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .option-card.youtube {
+            border-color: var(--error-200);
+        }
+
+        .option-card.youtube:hover {
+            border-color: var(--error-400);
+        }
+
+        .option-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .option-icon {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .option-icon.llm {
+            background: var(--purple-50);
+            color: var(--purple-600);
+        }
+
+        .option-icon.youtube {
+            background: var(--error-50);
+            color: var(--error-600);
+        }
+
+        .option-title {
+            font-weight: 600;
+            color: var(--gray-700);
+            font-size: 0.875rem;
+        }
+
+        .form-group {
+            margin-bottom: 0.75rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--gray-600);
+            margin-bottom: 0.375rem;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px var(--primary-100);
+        }
+
+        .form-help {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* ===== 提交按钮 ===== */
+        .submit-section {
+            margin-bottom: 2rem;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-submit:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-icon {
+            font-size: 1.125rem;
+        }
+
+        /* ===== 进度条 ===== */
+        .progress-container {
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .progress-bar {
+            background: var(--gray-200);
+            border-radius: 9999px;
+            height: 0.5rem;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, var(--primary-500), var(--primary-600));
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            text-align: center;
+        }
+
+        /* ===== 错误提示 ===== */
+        .error-message {
+            background: var(--error-50);
+            border: 1px solid var(--error-200);
+            color: var(--error-700);
+            padding: 1rem 1.25rem;
+            border-radius: 0.75rem;
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .error-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .error-text {
+            flex: 1;
+        }
+
+        .btn-retry {
+            background: var(--error-100);
+            color: var(--error-700);
+            border: none;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-retry:hover {
+            background: var(--error-200);
+        }
+
+        /* ===== 特性展示 ===== */
+        .features-section {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (min-width: 768px) {
+            .features-section {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        .feature-card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .feature-card.fast { border-top: 3px solid var(--warning-500); }
+        .feature-card.secure { border-top: 3px solid var(--purple-600); }
+        .feature-card.easy { border-top: 3px solid var(--success-600); }
+
+        .feature-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .feature-card.fast .feature-icon { background: var(--warning-50); color: var(--warning-500); }
+        .feature-card.secure .feature-icon { background: var(--purple-50); color: var(--purple-600); }
+        .feature-card.easy .feature-icon { background: var(--success-50); color: var(--success-600); }
+
+        .feature-title {
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 0.25rem;
+        }
+
+        .feature-desc {
+            font-size: 0.875rem;
+            color: var(--gray-500);
+        }
+
+        /* ===== 最近记录 ===== */
+        .recent-section {
+            border-top: 1px solid var(--gray-200);
+            padding-top: 2rem;
+        }
+
+        .recent-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .recent-title {
+            font-weight: 600;
+            color: var(--gray-700);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-clear {
+            background: none;
+            border: none;
+            color: var(--error-500);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+
+        .btn-clear:hover {
+            background: var(--error-50);
+        }
+
+        .recent-list {
+            list-style: none;
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .recent-item {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s;
+        }
+
+        .recent-item:hover {
+            border-color: var(--gray-300);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .recent-item-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .recent-icon {
+            width: 2rem;
+            height: 2rem;
+            background: var(--primary-50);
+            border-radius: 0.375rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-600);
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .recent-item-name {
+            font-weight: 500;
+            color: var(--gray-700);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .recent-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-download {
+            background: var(--primary-50);
+            color: var(--primary-700);
+            border: none;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-download:hover {
+            background: var(--primary-100);
+        }
+
+        .btn-delete {
+            background: none;
+            border: none;
+            color: var(--gray-400);
+            cursor: pointer;
+            padding: 0.375rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+
+        .btn-delete:hover {
+            color: var(--error-500);
+            background: var(--error-50);
+        }
+
+        /* ===== 模态框 ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: var(--shadow-xl);
+            max-width: 28rem;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--gray-800);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--gray-400);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            color: var(--gray-600);
+            background: var(--gray-100);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        .status-value {
+            font-size: 0.875rem;
+            color: var(--gray-800);
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: var(--success-50);
+            color: var(--success-700);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+        }
+
+        .tag {
+            background: var(--primary-50);
+            color: var(--primary-700);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* ===== 工具类 ===== */
+        .hidden {
+            display: none !important;
+        }
+
+        /* ===== 加载动画 ===== */
+        .spinner {
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 
-<body class="bg-gray-50 min-h-screen">
-<div class="container mx-auto px-4 py-8 max-w-3xl">
-    <!-- System Status Badge -->
-    <div class="flex justify-end mb-2">
-        <button id="systemStatusBtn" class="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full hover:bg-green-200 transition-colors">
-            <i class="fas fa-check-circle mr-1"></i>System Online
-        </button>
+<body>
+    <!-- 背景装饰 -->
+    <div class="bg-decoration">
+        <div class="bg-circle bg-circle-1"></div>
+        <div class="bg-circle bg-circle-2"></div>
+        <div class="bg-circle bg-circle-3"></div>
     </div>
-    
-    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
-        <!-- Header -->
-        <div class="p-6 bg-gradient-to-r from-blue-500 to-blue-600">
-            <h1 class="text-2xl font-bold text-white"><i class="fas fa-file-export mr-2"></i>File2MD Converter</h1>
-            <p class="text-blue-100 mt-1">Transform your files into Markdown instantly - Powered by MarkItDown</p>
+
+    <div class="container">
+        <!-- 顶部栏 -->
+        <div class="top-bar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fas fa-file-conversion"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>File2MD</h1>
+                    <p>智能文件转换器</p>
+                </div>
+            </div>
+            <button id="systemStatusBtn">
+                <i class="fas fa-circle-check"></i>
+                <span>系统正常</span>
+            </button>
         </div>
 
-        <!-- Main Content -->
-        <div class="p-6 space-y-6">
-            <!-- Upload Section -->
-            <section class="space-y-4">
-                <div class="space-y-2">
-                    <h2 class="text-lg font-semibold text-gray-700"><i class="fas fa-upload mr-2"></i>Upload File</h2>
-                    <div class="bg-blue-50 p-4 rounded-lg">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                            {% for ext, mime in allowed_mime_types.items() %}
-                            <div class="flex items-center bg-white px-2 py-1 rounded">
-                                <i class="fas fa-file text-blue-500 mr-1"></i>
-                                <span class="font-mono">{{ ext }}</span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        <p class="text-sm text-blue-800 mt-2">
-                            <i class="fas fa-info-circle mr-1"></i>Max size: {{ maxSize//(1024 * 1024) }}MB
-                        </p>
+        <!-- 主卡片 -->
+        <div class="main-card">
+            <!-- 卡片头部 -->
+            <div class="card-header">
+                <h2><i class="fas fa-bolt"></i> 快速转换为 Markdown</h2>
+                <p>支持 PDF、Office、图片、音频等多种格式，即时转换</p>
+            </div>
+
+            <!-- 卡片主体 -->
+            <div class="card-body">
+                <!-- 格式展示 -->
+                <div class="formats-section">
+                    <div class="formats-label">
+                        <i class="fas fa-layer-group"></i>
+                        <span>支持的格式</span>
+                    </div>
+                    <div class="formats-grid">
+                        {% for ext in supported_formats %}
+                        <span class="format-tag">{{ ext|upper }}</span>
+                        {% endfor %}
                     </div>
                 </div>
 
-                <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" class="space-y-4">
-                    <!-- LLM Configuration -->
-                    <div class="bg-gray-50 p-4 rounded-lg space-y-3">
-                        <div class="flex items-center mb-2">
-                            <i class="fas fa-robot text-purple-600 mr-2"></i>
-                            <h4 class="text-sm font-semibold text-gray-700">LLM Image Description (Optional)</h4>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-1">API Key</label>
-                                <input type="password" id="llmApiKey" placeholder="sk-..." 
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                       autocomplete="off">
+                <!-- 上传区域 -->
+                <div class="upload-section">
+                    <form id="uploadForm" enctype="multipart/form-data">
+                        <div class="dropzone" id="dropZone">
+                            <div class="dropzone-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
                             </div>
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-1">Model</label>
-                                <select id="llmModel" 
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                                    <option value="gpt-4o">GPT-4o</option>
-                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                                    <option value="claude-3-opus">Claude 3 Opus</option>
-                                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
-                                </select>
+                            <div class="dropzone-title">拖拽文件到此处，或点击选择</div>
+                            <div class="dropzone-hint">
+                                最大支持 <span class="highlight">{{ maxSize//(1024*1024) }}MB</span> 的文件
                             </div>
-                        </div>
-                        <p class="text-xs text-gray-500">
-                            <i class="fas fa-info-circle mr-1"></i>Used for describing images in documents (PPTX, Images)
-                        </p>
-                    </div>
-                    <!-- File Upload Container -->
-                    <div class="file-upload-container">
-                        <!-- Drag & Drop Zone -->
-                        <div id="dropZone"
-                             class="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
-                            <div class="drag-drop-content text-center">
-                                <svg class="w-8 h-8 text-gray-400 mb-2 mx-auto" fill="none" stroke="currentColor"
-                                     viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                                </svg>
-                                <p class="text-sm text-gray-600">
-                                    <span class="text-blue-600 font-medium">Choose file</span> or drag and drop
-                                </p>
-                                <input type="file" name="file" id="fileInput" class="hidden"
-                                       accept=".pdf,.docx,.pptx,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.txt,.md,.csv,.json,.xml,.html,.zip,.wav,.mp3,.epub"
-                                       required/>
-                            </div>
+                            <input type="file" name="file" id="fileInput" class="hidden" 
+                                   accept=".pdf,.docx,.pptx,.xlsx,.xls,.jpg,.jpeg,.png,.gif,.txt,.md,.csv,.json,.xml,.html,.zip,.wav,.mp3,.epub">
                         </div>
 
-                        <!-- Selected File Display -->
-                        <div id="selectedFile"
-                             class="hidden items-center justify-between bg-gray-50 p-4 rounded-lg mt-4 file-card">
-                            <div class="flex items-center truncate">
-                                <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor"
-                                     viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                                <span class="text-gray-700 truncate" id="fileName"></span>
+                        <!-- 文件信息 -->
+                        <div class="file-info" id="selectedFile">
+                            <div class="file-details">
+                                <div class="file-icon">
+                                    <i class="fas fa-file"></i>
+                                </div>
+                                <div class="file-name" id="fileName"></div>
                             </div>
-                            <button type="button" id="clearSelection" class="text-red-500 hover:text-red-600 ml-2">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
+                            <button type="button" class="file-remove" id="clearSelection">
+                                <i class="fas fa-times"></i>
                             </button>
                         </div>
+                    </form>
+                </div>
+
+                <!-- 配置选项 -->
+                <div class="options-section">
+                    <!-- LLM 配置 -->
+                    <div class="option-card">
+                        <div class="option-header">
+                            <div class="option-icon llm">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="option-title">AI 图像描述</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">API Key</label>
+                            <input type="password" id="llmApiKey" class="form-input" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">模型</label>
+                            <select id="llmModel" class="form-select">
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                <option value="claude-3-opus">Claude 3 Opus</option>
+                                <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                            </select>
+                        </div>
+                        <div class="form-help">
+                            <i class="fas fa-info-circle"></i>
+                            用于描述文档中的图片
+                        </div>
                     </div>
 
-                    <button id="uploadButton" type="submit"
-                            class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed shadow-md">
-                        <i class="fas fa-magic mr-2"></i>Start Conversion
-                    </button>
-                </form>
-            </section>
-
-            <!-- Progress & Error Section -->
-            <div id="progress" class="text-center text-sm text-gray-500 hidden"></div>
-            <div id="error-message" class="text-red-600 text-center text-sm hidden p-3 bg-red-50 rounded-lg"></div>
-            
-            <!-- Features Section -->
-            <section class="border-t pt-6">
-                <h3 class="font-medium text-gray-700 mb-4"><i class="fas fa-star mr-2"></i>Features</h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-green-50 p-3 rounded-lg">
-                        <div class="flex items-center mb-2">
-                            <i class="fas fa-bolt text-yellow-500 mr-2"></i>
-                            <span class="font-semibold text-gray-700">Fast Conversion</span>
+                    <!-- YouTube 配置 -->
+                    <div class="option-card youtube">
+                        <div class="option-header">
+                            <div class="option-icon youtube">
+                                <i class="fab fa-youtube"></i>
+                            </div>
+                            <div class="option-title">YouTube 转录</div>
                         </div>
-                        <p class="text-xs text-gray-600">Powered by MarkItDown engine</p>
-                    </div>
-                    <div class="bg-purple-50 p-3 rounded-lg">
-                        <div class="flex items-center mb-2">
-                            <i class="fas fa-shield-alt text-purple-500 mr-2"></i>
-                            <span class="font-semibold text-gray-700">Secure</span>
+                        <div class="form-group">
+                            <label class="form-label">视频 URL</label>
+                            <input type="url" id="youtubeUrl" class="form-input" 
+                                   placeholder="https://www.youtube.com/watch?v=...">
                         </div>
-                        <p class="text-xs text-gray-600">Auto-cleanup after processing</p>
-                    </div>
-                    <div class="bg-indigo-50 p-3 rounded-lg">
-                        <div class="flex items-center mb-2">
-                            <i class="fas fa-cloud-download-alt text-indigo-500 mr-2"></i>
-                            <span class="font-semibold text-gray-700">Easy Download</span>
+                        <div class="form-help">
+                            <i class="fas fa-info-circle"></i>
+                            或直接上传视频文件
                         </div>
-                        <p class="text-xs text-gray-600">Instant markdown download</p>
                     </div>
                 </div>
-            </section>
 
-            <!-- Recent Files Section -->
-            <section class="border-t pt-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="font-medium text-gray-700"><i class="fas fa-history mr-2"></i>Recent Conversions</h3>
-                    <button id="clearAllCache" class="text-xs text-red-500 hover:text-red-600">
-                        <i class="fas fa-trash mr-1"></i>Clear All
+                <!-- 提交按钮 -->
+                <div class="submit-section">
+                    <button type="submit" form="uploadForm" id="uploadButton" class="btn-submit">
+                        <i class="fas fa-magic btn-icon"></i>
+                        <span>开始转换</span>
                     </button>
                 </div>
-                <ul id="cachedFiles" class="space-y-3">
-                    <!-- Dynamic content from cache -->
-                </ul>
-            </section>
+
+                <!-- 进度条 -->
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">正在处理...</div>
+                </div>
+
+                <!-- 错误提示 -->
+                <div class="error-message" id="errorMessage">
+                    <div class="error-content">
+                        <div class="error-text" id="errorText"></div>
+                        <button class="btn-retry" onclick="location.reload()">重试</button>
+                    </div>
+                </div>
+
+                <!-- 特性展示 -->
+                <div class="features-section">
+                    <div class="feature-card fast">
+                        <div class="feature-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div class="feature-title">极速转换</div>
+                        <div class="feature-desc">MarkItDown 引擎驱动</div>
+                    </div>
+                    <div class="feature-card secure">
+                        <div class="feature-icon">
+                            <i class="fas fa-shield-halved"></i>
+                        </div>
+                        <div class="feature-title">安全可靠</div>
+                        <div class="feature-desc">自动清理保护隐私</div>
+                    </div>
+                    <div class="feature-card easy">
+                        <div class="feature-icon">
+                            <i class="fas fa-download"></i>
+                        </div>
+                        <div class="feature-title">便捷下载</div>
+                        <div class="feature-desc">一键获取 Markdown</div>
+                    </div>
+                </div>
+
+                <!-- 最近记录 -->
+                <div class="recent-section">
+                    <div class="recent-header">
+                        <div class="recent-title">
+                            <i class="fas fa-clock-rotate-left"></i>
+                            最近转换
+                        </div>
+                        <button class="btn-clear" id="clearAllCache">
+                            <i class="fas fa-trash"></i>
+                            清空记录
+                        </button>
+                    </div>
+                    <ul class="recent-list" id="cachedFiles">
+                        <!-- 动态内容 -->
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- System Status Modal -->
-<div id="systemStatusModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3 text-center">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">
-                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>System Status
-                </h3>
-                <button id="closeModal" class="text-gray-400 hover:text-gray-500">
+    <!-- 系统状态模态框 -->
+    <div class="modal-overlay" id="systemStatusModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-circle-info"></i>
+                    系统状态
+                </div>
+                <button class="modal-close" id="closeModal">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="mt-2 px-7 py-3">
-                <div id="modalContent" class="space-y-3">
-                    <div class="animate-pulse">
-                        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                    </div>
-                </div>
+            <div class="modal-body" id="modalContent">
+                <!-- 动态内容 -->
             </div>
         </div>
     </div>
-</div>
 
-<script>
-    const socket = io();
-    $(document).ready(function () {
-        // Element initialization
-        const dropZone = $('#dropZone');
-        const fileInput = $('#fileInput');
-        const selectedFile = $('#selectedFile');
-        const fileName = $('#fileName');
-        const clearSelection = $('#clearSelection');
-        const uploadButton = $('#uploadButton');
-        const progress = $('#progress');
-        const errorMessage = $('#error-message');
-        const cachedFiles = $('#cachedFiles');
-        const uploadForm = $('#uploadForm');
-        const systemStatusBtn = $('#systemStatusBtn');
-        const systemStatusModal = $('#systemStatusModal');
-        const closeModal = $('#closeModal');
-        const modalContent = $('#modalContent');
-        const llmApiKey = $('#llmApiKey');
-        const llmModel = $('#llmModel');
+    <script>
+        const socket = io();
+        $(document).ready(function () {
+            // 元素引用
+            const dropZone = $('#dropZone');
+            const fileInput = $('#fileInput');
+            const selectedFile = $('#selectedFile');
+            const fileName = $('#fileName');
+            const clearSelection = $('#clearSelection');
+            const uploadButton = $('#uploadButton');
+            const progressContainer = $('#progressContainer');
+            const progressFill = $('#progressFill');
+            const progressText = $('#progressText');
+            const errorMessage = $('#errorMessage');
+            const errorText = $('#errorText');
+            const cachedFiles = $('#cachedFiles');
+            const uploadForm = $('#uploadForm');
+            const systemStatusBtn = $('#systemStatusBtn');
+            const systemStatusModal = $('#systemStatusModal');
+            const closeModal = $('#closeModal');
+            const modalContent = $('#modalContent');
+            const llmApiKey = $('#llmApiKey');
+            const llmModel = $('#llmModel');
+            const youtubeUrl = $('#youtubeUrl');
 
-        // Fix drag and drop initialization
-        function initDragDrop() {
-            // Prevent default drag and drop behavior
-            $(document).on('dragover dragenter', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            });
+            // 初始化拖拽
+            function initDragDrop() {
+                $(document).on('dragover dragenter', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
 
-            // Drag and drop area handling
-            dropZone
+                dropZone
                     .on('dragover', function (e) {
                         e.preventDefault();
                         $(this).addClass('dragover');
@@ -258,343 +1199,303 @@
                         handleFileSelection(e.originalEvent.dataTransfer.files[0]);
                     });
 
-            dropZone.on('click', function (e) {
-                // Trigger only when clicking on the drop zone itself
-                if (e.target === this || $(e.target).hasClass('drag-drop-content')) {
-                    fileInput.trigger('click');
-                }
-            });
+                dropZone.on('click', function (e) {
+                    if (e.target === this || $(e.target).closest('.dropzone-icon, .dropzone-title, .dropzone-hint').length) {
+                        fileInput.trigger('click');
+                    }
+                });
 
-            // File input handling
-            fileInput.on('change', function () {
-                if (this.files.length > 0) {
-                    handleFileSelection(this.files[0]);
-                }
-            });
+                fileInput.on('change', function () {
+                    if (this.files.length > 0) {
+                        handleFileSelection(this.files[0]);
+                    }
+                });
 
-            // Clear selection
-            clearSelection.on('click', function (e) {
-                e.stopPropagation();
-                resetFileSelection();
-            });
-        }
-
-        // File selection handling
-        function handleFileSelection(file) {
-            if (!file) return;
-
-            // File size validation
-            const maxSize = {{maxSize}};
-            if (file.size > maxSize) {
-                displayErrorMessage(`File size exceeds limit (max ${maxSize / (1024 * 1024)}MB)`);
-                return;
+                clearSelection.on('click', resetFileSelection);
             }
 
-            // Update interface
-            fileName.text(file.name);
-            dropZone.hide();
-            selectedFile.removeClass('hidden');
-            uploadButton.prop('disabled', false);
+            // 文件选择处理
+            function handleFileSelection(file) {
+                if (!file) return;
 
-            // Update file input
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            fileInput[0].files = dataTransfer.files;
-            const tempId = 'temp-' + Date.now();
-            cacheProcessedFile(tempId, '', file.name);
-        }
+                const maxSize = {{maxSize}};
+                if (file.size > maxSize) {
+                    showError(`文件大小超过限制 (最大 {{maxSize//(1024*1024)}}MB)`);
+                    return;
+                }
 
-        // Reset selection
-        function resetFileSelection() {
-            fileInput.val('');
-            selectedFile.addClass('hidden');
-            dropZone.show();
-            uploadButton.prop('disabled', true);
-            progress.text('');
-        }
+                fileName.text(file.name);
+                dropZone.hide();
+                selectedFile.css('display', 'flex');
+                uploadButton.prop('disabled', false);
 
-        // Cache processed file
-        function cacheProcessedFile(unique_id, url, filename) {
-            const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
-            filesCache[unique_id] = {
-                url: url,
-                filename: filename || 'Unknown file',
-                timestamp: new Date().toISOString()
-            };
-            localStorage.setItem('processedFiles', JSON.stringify(filesCache));
-        }
-
-        // Remove cached file
-        function removeCachedFile(unique_id) {
-            const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
-            delete filesCache[unique_id];
-            localStorage.setItem('processedFiles', JSON.stringify(filesCache));
-        }
-
-        // Update cached files list
-        function updateCachedFilesList() {
-            const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
-            cachedFiles.empty();
-
-            if (Object.keys(filesCache).length === 0) {
-                cachedFiles.append(
-                        '<li class="text-center text-gray-500 py-4">No recent conversions</li>'
-                );
-                return;
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput[0].files = dataTransfer.files;
+                
+                const tempId = 'temp-' + Date.now();
+                cacheProcessedFile(tempId, '', file.name);
             }
 
-            // Sort by timestamp (newest first)
-            const sortedFiles = Object.entries(filesCache)
+            // 重置选择
+            function resetFileSelection() {
+                fileInput.val('');
+                selectedFile.hide();
+                dropZone.show();
+                uploadButton.prop('disabled', true);
+                hideProgress();
+            }
+
+            // 缓存文件
+            function cacheProcessedFile(unique_id, url, filename) {
+                const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
+                filesCache[unique_id] = {
+                    url: url,
+                    filename: filename || '未知文件',
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem('processedFiles', JSON.stringify(filesCache));
+            }
+
+            // 删除缓存
+            function removeCachedFile(unique_id) {
+                const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
+                delete filesCache[unique_id];
+                localStorage.setItem('processedFiles', JSON.stringify(filesCache));
+            }
+
+            // 更新列表
+            function updateCachedFilesList() {
+                const filesCache = JSON.parse(localStorage.getItem('processedFiles')) || {};
+                cachedFiles.empty();
+
+                if (Object.keys(filesCache).length === 0) {
+                    cachedFiles.append('<li class="recent-item"><div class="recent-item-info"><div class="recent-icon"><i class="fas fa-inbox"></i></div><div class="recent-item-name">暂无转换记录</div></div></li>');
+                    return;
+                }
+
+                const sortedFiles = Object.entries(filesCache)
                     .sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp));
 
-            sortedFiles.forEach(([key, data]) => {
-                cachedFiles.append(`
-                <li class="flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100 transition-colors file-card">
-                    <div class="flex items-center truncate flex-1">
-                        <svg class="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        <span class="text-gray-700 truncate">${data.filename}</span>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button class="downloadBtn px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium" data-url="${data.url}">
-                            Download
-                        </button>
-                        <button class="deleteBtn p-1 text-red-500 hover:text-red-600 rounded-full hover:bg-red-50" data-id="${key}" title="Delete">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                        </button>
-                    </div>
-                </li>`
-                );
+                sortedFiles.forEach(([key, data]) => {
+                    cachedFiles.append(`
+                        <li class="recent-item">
+                            <div class="recent-item-info">
+                                <div class="recent-icon">
+                                    <i class="fas fa-file-lines"></i>
+                                </div>
+                                <div class="recent-item-name">${data.filename}</div>
+                            </div>
+                            <div class="recent-actions">
+                                <button class="btn-download" data-url="${data.url}">下载</button>
+                                <button class="btn-delete" data-id="${key}" title="删除">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </li>
+                    `);
+                });
+            }
+
+            // 表单提交
+            uploadForm.on('submit', function (e) {
+                e.preventDefault();
+
+                const hasYoutubeUrl = youtubeUrl.val() && youtubeUrl.val().trim();
+                const hasFile = fileInput[0].files.length;
+                
+                if (!hasYoutubeUrl && !hasFile) {
+                    showError('请选择文件或输入 YouTube URL');
+                    return;
+                }
+
+                const formData = new FormData(this);
+                
+                if (llmApiKey.val().trim()) {
+                    formData.append('llm_api_key', llmApiKey.val().trim());
+                    formData.append('llm_model', llmModel.val());
+                }
+                
+                if (hasYoutubeUrl) {
+                    formData.append('youtube_url', youtubeUrl.val().trim());
+                }
+                
+                setLoading(true);
+                showProgress(0, '正在上传并处理...');
+                hideError();
+
+                $.ajax({
+                    url: '/upload',
+                    type: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function (response) {
+                        showProgress(50, '正在转换...');
+                        
+                        const tempFiles = JSON.parse(localStorage.getItem('processedFiles')) || {};
+                        const tempEntry = Object.entries(tempFiles).find(([k, v]) => v.url === '');
+                        const realFilename = tempEntry ? tempEntry[1].filename : (hasYoutubeUrl ? 'YouTube 视频' : '未知文件');
+                        cacheProcessedFile(response.unique_id, '', realFilename);
+                        if (tempEntry) removeCachedFile(tempEntry[0]);
+                    },
+                    error: function (xhr) {
+                        setLoading(false);
+                        hideProgress();
+                        showError(xhr.responseJSON?.message || '上传失败，请重试');
+                    }
+                });
             });
-        }
 
-        // Initialize drag and drop
-        initDragDrop();
+            // Socket 事件
+            socket.on('processing_progress', function (data) {
+                const percent = Math.floor((data.current / data.total) * 100);
+                showProgress(percent, data.message || '处理中...');
+            });
 
-        // Form submission
-        uploadForm.on('submit', function (e) {
-            e.preventDefault();
-
-            const tempFiles = JSON.parse(localStorage.getItem('processedFiles')) || {};
-            const tempEntry = Object.entries(tempFiles).find(([k, v]) => v.url === '');
-            const realFilename = tempEntry ? tempEntry[1].filename : 'Unknown file';
-            if (!fileInput[0].files.length) {
-                displayErrorMessage('Please select a file first');
-                return;
-            }
-
-            const formData = new FormData(this);
-            
-            // Add LLM configuration if provided
-            const apiKey = llmApiKey.val().trim();
-            const model = llmModel.val();
-            if (apiKey) {
-                formData.append('llm_api_key', apiKey);
-                formData.append('llm_model', model);
-            }
-            
-            uploadButton
-                    .prop('disabled', true)
-                    .html('<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...');
-            progress.text('Uploading and processing your file...');
-            errorMessage.addClass('hidden');
-
-            $.ajax({
-                url: '/upload',
-                type: 'POST',
-                data: formData,
-                contentType: false,
-                processData: false,
-                success: function (response) {
-                    progress.text('File is being processed...');
-                    // Update formal cache record
-                    cacheProcessedFile(response.unique_id, '', realFilename);
-                    // Clear temporary record
+            socket.on('process_complete', function (data) {
+                setLoading(false);
+                
+                if (data.error) {
+                    showError(data.error);
+                    const tempFiles = JSON.parse(localStorage.getItem('processedFiles')) || {};
+                    const tempEntry = Object.entries(tempFiles).find(([k, v]) => k.includes('temp-'));
                     if (tempEntry) removeCachedFile(tempEntry[0]);
-                },
-                error: function (xhr) {
-                    resetUploadButton();
-                    progress.text('');
-                    const errorMsg = xhr.responseJSON?.message || 'An error occurred during upload';
-                    displayErrorMessage(errorMsg);
+                } else {
+                    showProgress(100, '转换完成！');
+                    setTimeout(hideProgress, 2000);
+                    
+                    cacheProcessedFile(data.unique_id, data.url, data.original_name || '未命名文件');
+                    updateCachedFilesList();
+                    resetFileSelection();
                 }
             });
-        });
 
-        // Processing completion handler
-        socket.on('processing_progress', function (data) {
-            // Real-time update of processing progress
-            const progressPercent = Math.floor((data.current / data.total) * 100);
-            progress.html(`
-            <div class="flex items-center">
-                <span class="mr-2">Processing...</span>
-                <div class="w-24 bg-gray-200 rounded-full h-2">
-                    <div class="bg-blue-500 h-2 rounded-full" style="width: ${progressPercent}%"></div>
-                </div>
-                <span class="ml-2">${progressPercent}%</span>
-            </div>
-        `);
-        });
-
-        socket.on('conversion_error', function (data) {
-            // Error handling
-            progress.text('');
-            uploadButton.prop('disabled', false).html('<i class="fas fa-magic mr-2"></i>Convert to Markdown');
-            displayErrorMessage(data.error || 'An unknown error occurred during conversion');
-            removeCachedFile(data.unique_id); // Clear invalid cache
-        });
-
-        function displayErrorMessage(msg) {
-            errorMessage
-                    .removeClass('hidden')
-                    .html(`
-                <div class="flex items-center justify-between">
-                    <span>${msg}</span>
-                    <button onclick="location.reload()" class="ml-4 px-2 py-1 bg-red-100 text-red-600 rounded">
-                        Retry
-                    </button>
-                </div>
-            `);
-        }
-
-        // Socket response handler
-        socket.on('response', function (data) {
-            console.log('Server message:', data.message);
-        });
-
-        // Processing complete handler with visual feedback
-        socket.on('process_complete', function (data) {
-            if (data.error) {
-                // Failure handling
-                progress.text('');
-                uploadButton.prop('disabled', false).html('<i class="fas fa-magic mr-2"></i>Convert to Markdown');
-                displayErrorMessage(data.error);
-                removeCachedFile(data.unique_id);
-            } else {
-                // Success handling with success icon
-                progress.html('<i class="fas fa-check-circle text-green-600 mr-2"></i>Conversion completed successfully!');
-                uploadButton.prop('disabled', false).html('<i class="fas fa-magic mr-2"></i>Convert to Markdown');
-                cacheProcessedFile(
-                        data.unique_id,
-                        data.url,
-                        data.original_name || 'Unnamed file' // Receive original file name
-                );
-                updateCachedFilesList();
-            }
-            resetFileSelection();
-        });
-
-        // Download button handler
-        $(document).on('click', '.downloadBtn', function () {
-            const url = $(this).data('url');
-            fetch(url, {method: 'HEAD'})
+            // 下载按钮
+            $(document).on('click', '.btn-download', function () {
+                const url = $(this).data('url');
+                fetch(url, {method: 'HEAD'})
                     .then(response => {
                         if (response.status === 404) {
-                            const uniqueId = $(this).siblings('.deleteBtn').data('id');
+                            const uniqueId = $(this).siblings('.btn-delete').data('id');
                             removeCachedFile(uniqueId);
-                            displayErrorMessage('File not found, cache cleared.');
-                            $(this).closest('li').remove();
+                            $(this).closest('.recent-item').remove();
+                            showError('文件已被清理');
                         } else {
                             window.location.href = url;
                         }
                     })
-                    .catch(err => {
-                        console.error('Error checking file:', err);
-                        displayErrorMessage('Error checking file. Please try again.');
-                    });
-        });
-
-        // Delete button handler
-        $(document).on('click', '.deleteBtn', function (e) {
-            e.stopPropagation();
-            const uniqueId = $(this).data('id');
-            removeCachedFile(uniqueId);
-            $(this).closest('li').remove();
-        });
-
-        // Clear all cache handler
-        $('#clearAllCache').on('click', function () {
-            if (confirm('Are you sure you want to clear all cached files?')) {
-                localStorage.removeItem('processedFiles');
-                updateCachedFilesList();
-            }
-        });
-
-        // Initialize cached files list
-        updateCachedFilesList();
-
-        // System status modal handler
-        systemStatusBtn.on('click', function () {
-            loadSystemStatus();
-        });
-
-        closeModal.on('click', function () {
-            systemStatusModal.addClass('hidden');
-        });
-
-        $(window).on('click', function (e) {
-            if (e.target === systemStatusModal[0]) {
-                systemStatusModal.addClass('hidden');
-            }
-        });
-
-        // Load system status
-        function loadSystemStatus() {
-            modalContent.html(`
-                <div class="animate-pulse space-y-3">
-                    <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div class="h-4 bg-gray-200 rounded w-1/2"></div>
-                    <div class="h-4 bg-gray-200 rounded w-5/6"></div>
-                </div>
-            `);
-            systemStatusModal.removeClass('hidden');
-
-            $.get('/api/status', function (data) {
-                const formatsHtml = data.supported_formats.map(f => 
-                    `<span class="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs m-1">${f}</span>`
-                ).join('');
-
-                const featuresHtml = data.features.map(f => 
-                    `<li class="flex items-center text-sm text-gray-700"><i class="fas fa-check text-green-500 mr-2"></i>${f}</li>`
-                ).join('');
-
-                modalContent.html(`
-                    <div class="space-y-4 text-left">
-                        <div class="flex items-center justify-between bg-green-50 p-3 rounded">
-                            <span class="text-sm font-semibold text-green-700">Status: ${data.status.toUpperCase()}</span>
-                            <span class="text-xs text-green-600">v${data.version}</span>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold text-gray-600 mb-2">POWERED BY</p>
-                            <p class="text-sm text-blue-600 font-medium">${data.powered_by}</p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold text-gray-600 mb-2">MAX FILE SIZE</p>
-                            <p class="text-sm text-gray-700">${data.max_file_size_mb} MB</p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold text-gray-600 mb-2">SUPPORTED FORMATS</p>
-                            <div class="flex flex-wrap">${formatsHtml}</div>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold text-gray-600 mb-2">FEATURES</p>
-                            <ul class="space-y-1">${featuresHtml}</ul>
-                        </div>
-                    </div>
-                `);
-            }).fail(function () {
-                modalContent.html(`
-                    <div class="text-red-600">
-                        <i class="fas fa-exclamation-triangle mr-2"></i>
-                        Failed to load system status
-                    </div>
-                `);
+                    .catch(() => showError('检查文件失败'));
             });
-        }
-    });
-</script>
+
+            // 删除按钮
+            $(document).on('click', '.btn-delete', function (e) {
+                e.stopPropagation();
+                const uniqueId = $(this).data('id');
+                removeCachedFile(uniqueId);
+                $(this).closest('.recent-item').remove();
+            });
+
+            // 清空记录
+            $('#clearAllCache').on('click', function () {
+                if (confirm('确定要清空所有转换记录吗？')) {
+                    localStorage.removeItem('processedFiles');
+                    updateCachedFilesList();
+                }
+            });
+
+            // 系统状态
+            systemStatusBtn.on('click', loadSystemStatus);
+            closeModal.on('click', () => systemStatusModal.css('display', 'none'));
+            $(window).on('click', function (e) {
+                if (e.target === systemStatusModal[0]) {
+                    systemStatusModal.css('display', 'none');
+                }
+            });
+
+            function loadSystemStatus() {
+                modalContent.html('<div style="text-align:center;padding:2rem;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>');
+                systemStatusModal.css('display', 'flex');
+
+                $.get('/api/status', function (data) {
+                    const tagsHtml = data.supported_formats.slice(0, 10).map(f => 
+                        `<span class="tag">${f.toUpperCase()}</span>`
+                    ).join('');
+
+                    const featuresHtml = data.features.map(f => 
+                        `<div class="status-item">
+                            <span class="status-label"><i class="fas fa-check" style="color:var(--success-600)"></i> ${f}</span>
+                        </div>`
+                    ).join('');
+
+                    modalContent.html(`
+                        <div style="display:flex;flex-direction:column;gap:1rem;">
+                            <div class="status-item">
+                                <span class="status-label">状态</span>
+                                <span class="badge-success">${data.status.toUpperCase()}</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">版本</span>
+                                <span class="status-value">v${data.version}</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">核心引擎</span>
+                                <span class="status-value">${data.powered_by}</span>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-label">最大文件大小</span>
+                                <span class="status-value">${data.max_file_size_mb} MB</span>
+                            </div>
+                            <div>
+                                <div class="status-label" style="margin-bottom:0.5rem">支持格式</div>
+                                <div class="tag-container">${tagsHtml}</div>
+                            </div>
+                            <div>
+                                <div class="status-label" style="margin-bottom:0.5rem">功能特性</div>
+                                <div>${featuresHtml}</div>
+                            </div>
+                        </div>
+                    `);
+                }).fail(() => {
+                    modalContent.html('<div style="color:var(--error-600);text-align:center;padding:2rem;"><i class="fas fa-triangle-exclamation"></i> 加载失败</div>');
+                });
+            }
+
+            // 工具函数
+            function setLoading(loading) {
+                if (loading) {
+                    uploadButton.prop('disabled', true)
+                        .html('<span class="spinner"></span><span>处理中...</span>');
+                } else {
+                    uploadButton.prop('disabled', false)
+                        .html('<i class="fas fa-magic btn-icon"></i><span>开始转换</span>');
+                }
+            }
+
+            function showProgress(percent, text) {
+                progressContainer.css('display', 'block');
+                progressFill.css('width', percent + '%');
+                progressText.text(text);
+            }
+
+            function hideProgress() {
+                progressContainer.hide();
+                progressFill.css('width', '0%');
+            }
+
+            function showError(msg) {
+                errorText.text(msg);
+                errorMessage.css('display', 'block');
+            }
+
+            function hideError() {
+                errorMessage.hide();
+            }
+
+            // 初始化
+            initDragDrop();
+            updateCachedFilesList();
+        });
+    </script>
 </body>
 </html>

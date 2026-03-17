@@ -60,6 +60,12 @@
 git clone https://github.com/Athenavi/File2MD
 cd File2MD
 
+# 复制环境配置文件
+cp .env.example .env
+
+# 根据需要编辑 .env 文件
+# vi .env 或 notepad .env
+
 # 安装依赖
 pip install -r requirements.txt
 ```
@@ -83,12 +89,21 @@ MAX_CONTENT_LENGTH=52428800  # 50MB
 ### 启动服务
 
 ```bash
-# 开发模式
+# 开发模式（单进程，适合测试）
 python app.py
 
-# 生产模式 (需要安装 gunicorn)
+# 生产模式 - 方式 1：使用 Flask 内置服务器（需要安装 gunicorn）
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
+
+# 生产模式 - 方式 2：使用 Celery Worker（推荐，需要 Redis）
+# 终端 1：启动 Celery Worker
+celery -A celery_worker worker --loglevel=info --pool=solo
+
+# 终端 2：启动 Flask 应用
+python app.py
 ```
+
+**注意**：Windows 环境下建议使用 `--pool=solo` 参数运行 Celery Worker。
 
 ## 📊 系统状态
 
@@ -120,7 +135,8 @@ POST /upload
 Content-Type: multipart/form-data
 
 Parameters:
-- file: 要转换的文件
+- file: 要转换的文件（可选，与 youtube_url 二选一）
+- youtube_url: YouTube 视频 URL（可选，与 file 二选一）
 - llm_api_key: (可选) OpenAI API Key，用于图像描述
 - llm_model: (可选) LLM 模型名称，默认 gpt-4o
 
@@ -130,6 +146,10 @@ Response:
   "unique_id": "550e8400-e29b-41d4-a716-446655440000"
 }
 ```
+
+**示例**：
+- 上传文件：选择本地文件进行转换
+- YouTube URL：输入 `https://www.youtube.com/watch?v=xxxxx` 进行视频转录
 
 ### 下载转换结果
 
@@ -166,15 +186,19 @@ socket.on('process_complete', (data) => {
 ## 🔒 安全特性
 
 - **深度文件验证**  
-  双重校验（文件头+内容结构分析）
+  双重校验（文件头 + 内容结构分析）+ 沙箱隔离处理
+- **敏感信息过滤**  
+  自动脱敏 API Key、密码、密钥等敏感日志信息
 - **请求限流**  
-  50请求/小时/IP 的默认策略
+  50 请求/小时/IP 的默认策略
 - **日志脱敏**  
-  自动过滤敏感路径信息
+  自动过滤敏感路径信息和敏感数据
 - **沙箱处理**  
-  独立线程池执行转换任务
-- **CSP防护**  
-  默认启用严格内容安全策略
+  独立临时环境执行转换任务，自动清理资源
+- **CSP 防护**  
+  严格内容安全策略，防止 XSS 攻击
+- **安全响应头**  
+  X-Content-Type-Options, X-Frame-Options 等完整防护
 
 ## 🤝 贡献指南
 
